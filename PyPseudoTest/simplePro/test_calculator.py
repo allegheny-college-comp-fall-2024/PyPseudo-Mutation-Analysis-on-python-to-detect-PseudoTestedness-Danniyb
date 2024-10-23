@@ -1,6 +1,6 @@
 import pytest
-#from calculator import Calculator
-from mutated_calculator import Calculator
+from calculator import Calculator
+# from mutated_calculator import Calculator
 from mutation_plugin import MutationPlugin
 
 # Fixture for the plugin

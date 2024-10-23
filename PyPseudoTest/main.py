@@ -36,7 +36,7 @@ def main():
         pytest_args.extend(['--cov-report', args.cov_report])
 
     # Instrument the code
-    run_instrumentation('simplePro/calculator.py', 'simplePro/mutated_calculator.py', args.mutant_file)
+    run_instrumentation('simplePro/calculator.py', args.mutant_file)
 
     # Initialize the plugin and inject it into Calculator
     plugin = MutationPlugin(args.mutant_file)
