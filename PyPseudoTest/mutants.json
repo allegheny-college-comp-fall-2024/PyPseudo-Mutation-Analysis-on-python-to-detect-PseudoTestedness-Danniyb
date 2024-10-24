@@ -1,9 +1,0 @@
-{
-  "enable_mutation": false, 
-  "enabled_mutants": [
-      "skip-addition",
-      "invert-subtraction",
-      "skip-multiplication",
-      "skip-division"
-  ]
-}
