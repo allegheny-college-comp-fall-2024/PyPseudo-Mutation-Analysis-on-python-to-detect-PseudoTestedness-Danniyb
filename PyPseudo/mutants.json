@@ -1,5 +1,5 @@
 {
-  "enable_mutation": false, 
+  "enable_mutation": true, 
   "enabled_mutants": [
       "skip-addition",
       "invert-subtraction",
