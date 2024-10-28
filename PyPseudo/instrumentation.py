@@ -1,9 +1,9 @@
-# instrumentation.py
 import ast
 import astor
 import json
 import logging
 import os
+# import shutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,6 +36,12 @@ class MutantInserter(ast.NodeTransformer):
             
         # Regular function handling
         if '*' in self.xmt_targets or node.name in self.xmt_targets:
+            # Check if mutation is already present
+            for stmt in node.body:
+                if isinstance(stmt, ast.If) and 'is_mutant_enabled' in astor.to_source(stmt):
+                    return node  # Skip if mutation is already present
+                    
+            # Add mutation if not present
             mutation_check = ast.parse(
                 f"if {self.plugin_name}.is_mutant_enabled('xmt_{node.name}'):\n"
                 f"    print(f'XMT: Removing body of function {node.name}')\n"
@@ -58,7 +64,7 @@ class MutantInserter(ast.NodeTransformer):
             return ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
-                orelse=[node]  # Keep original for loop in else branch
+                orelse=[node]
             )
         
         return node
@@ -76,7 +82,7 @@ class MutantInserter(ast.NodeTransformer):
             return ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
-                orelse=[node]  # Keep original if statement in else branch
+                orelse=[node]
             )
         
         return node
@@ -121,14 +127,20 @@ def run_instrumentation(input_file, mutant_file):
 def restore_original(file_path, backup_path):
     """Restore the original code from backup"""
     try:
-        if backup_path and os.path.exists(backup_path):
-            with open(backup_path, 'r') as f:
-                original_code = f.read()
+        if os.path.exists(backup_path):
+            # Read backup content
+            with open(backup_path, 'r') as backup_file:
+                original_content = backup_file.read()
             
-            with open(file_path, 'w') as f:
-                f.write(original_code)
-                
-            logger.info(f"Successfully restored original code for {file_path}")
+            # Write backup content to original file
+            with open(file_path, 'w') as target_file:
+                target_file.write(original_content)
+            
+            # Remove backup file after successful restore
+            os.remove(backup_path)
+            logger.info(f"Successfully restored {file_path}")
+        else:
+            logger.warning(f"No backup file found at {backup_path}")
     except Exception as e:
         logger.error(f"Error restoring original code: {e}")
         raise

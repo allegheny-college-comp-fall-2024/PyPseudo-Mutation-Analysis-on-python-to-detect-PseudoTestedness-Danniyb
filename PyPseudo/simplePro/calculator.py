@@ -1,12 +1,9 @@
 class Calculator:
-
     def __init__(self, plugin):
         self.plugin = plugin
 
     def add(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_add'):
-            print(f'XMT: Removing body of function add')
-            return None
+        # Step-by-step addition
         result = a
         while b > 0:
             result += 1
@@ -17,9 +14,7 @@ class Calculator:
         return result
 
     def subtract(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_subtract'):
-            print(f'XMT: Removing body of function subtract')
-            return None
+        # Step-by-step subtraction
         result = a
         while b > 0:
             result -= 1
@@ -30,9 +25,7 @@ class Calculator:
         return result
 
     def multiply(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_multiply'):
-            print(f'XMT: Removing body of function multiply')
-            return None
+        # Step-by-step multiplication using repeated addition
         result = 0
         positive_b = abs(b)
         for _ in range(positive_b):
@@ -42,27 +35,23 @@ class Calculator:
         return result
 
     def divide(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_divide'):
-            print(f'XMT: Removing body of function divide')
-            return None
+        # Step-by-step division using repeated subtraction
         if b == 0:
-            raise ValueError('Cannot divide by zero')
+            raise ValueError("Cannot divide by zero")
         abs_a = abs(a)
         abs_b = abs(b)
         quotient = 0
         while abs_a >= abs_b:
             abs_a = self.subtract(abs_a, abs_b)
             quotient = self.add(quotient, 1)
-        if a < 0 and b > 0 or a > 0 and b < 0:
+        if (a < 0 and b > 0) or (a > 0 and b < 0):
             quotient = -quotient
         return quotient
 
     def modulus(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_modulus'):
-            print(f'XMT: Removing body of function modulus')
-            return None
+        # Step-by-step modulus using repeated subtraction
         if b == 0:
-            raise ValueError('Cannot divide by zero')
+            raise ValueError("Cannot divide by zero")
         abs_a = abs(a)
         abs_b = abs(b)
         while abs_a >= abs_b:
@@ -72,9 +61,7 @@ class Calculator:
         return abs_a
 
     def power(self, a, b):
-        if self.plugin.is_mutant_enabled('xmt_power'):
-            print(f'XMT: Removing body of function power')
-            return None
+        # Step-by-step power calculation using repeated multiplication
         if b == 0:
             return 1
         result = 1
@@ -85,12 +72,9 @@ class Calculator:
         return result
 
     def square_root(self, a, tolerance=1e-10, max_iterations=1000):
-        if self.plugin.is_mutant_enabled('xmt_square_root'):
-            print(f'XMT: Removing body of function square_root')
-            return None
+        # Step-by-step square root using Newton-Raphson method
         if a < 0:
-            raise ValueError('Cannot take the square root of a negative number'
-                )
+            raise ValueError("Cannot take the square root of a negative number")
         if a == 0:
             return 0
         x = a
@@ -99,4 +83,4 @@ class Calculator:
             if abs(root - x) < tolerance:
                 return root
             x = root
-        raise ValueError('Failed to converge to a solution')
+        raise ValueError("Failed to converge to a solution")
