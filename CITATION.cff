@@ -1,0 +1,62 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the following metadata"
+title: "PyPseudo: A Python Implementation for Detecting Pseudo-Tested Code"
+authors:
+  - family-names: "Bekele"
+    given-names: "Daniel"
+type: software
+url: "https://github.com/Danniyb/PyPseudo-Mutation-Analysis-on-python-to-detect-PseudoTestedness-Danniyb"
+repository-code: "https://github.com/Danniyb/PyPseudo-Mutation-Analysis-on-python-to-detect-PseudoTestedness-Danniyb"
+abstract: >-
+  PyPseudo is a Python implementation of pseudo-tested code detection, adapting the 
+  PseudoSweep tool from Java to Python. This implementation is based on the research 
+  and methodology presented in "Exploring Pseudo-Testedness: Empirically Evaluating 
+  Extreme Mutation Testing at the Statement Level" and its accompanying tool paper. 
+  The tool provides mutation testing capabilities to identify pseudo-tested elements 
+  in Python code, similar to its Java counterpart.
+keywords:
+  - python
+  - mutation-testing
+  - pseudo-tested-code
+  - test-quality
+  - software-testing
+license: MIT
+version: 1.0.0
+date-released: "2024-02-11"
+references:
+  - type: software
+    authors:
+      - family-names: "Maton"
+        given-names: "Megan"
+      - family-names: "Kapfhammer"
+        given-names: "Gregory M."
+      - family-names: "McMinn"
+        given-names: "Phil"
+    title: "PseudoSweep"
+    url: "https://github.com/PseudoTested/PseudoSweep"
+    repository-code: "https://github.com/PseudoTested/PseudoSweep"
+    abstract: "Original Java implementation for detecting pseudo-tested code"
+  - type: article
+    authors:
+      - family-names: "Maton"
+        given-names: "Megan"
+      - family-names: "Kapfhammer"
+        given-names: "Gregory M."
+      - family-names: "McMinn"
+        given-names: "Phil"
+    title: "Exploring Pseudo-Testedness: Empirically Evaluating Extreme Mutation Testing at the Statement Level"
+    year: 2024
+    conference:
+      name: "International Conference on Software Maintenance and Evolution"
+  - type: article
+    authors:
+      - family-names: "Maton"
+        given-names: "Megan"
+      - family-names: "Kapfhammer"
+        given-names: "Gregory M."
+      - family-names: "McMinn"
+        given-names: "Phil"
+    title: "PSEUDOSWEEP: A Pseudo-Tested Code Identifier"
+    year: 2024
+    conference:
+      name: "International Conference on Software Maintenance and Evolution, Tool Track"
