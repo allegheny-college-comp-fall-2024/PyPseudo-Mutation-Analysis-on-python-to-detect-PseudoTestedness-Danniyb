@@ -1,3 +1,4 @@
+# instrumentation.py
 import ast
 import astor
 import json
@@ -11,44 +12,73 @@ class MutantInserter(ast.NodeTransformer):
     def __init__(self, plugin_name, mutants):
         self.plugin_name = plugin_name
         self.mutants = mutants
+        self.xmt_targets = set()
+        self.sdl_targets = set()
+        self._process_mutants(mutants)
+
+    def _process_mutants(self, mutants):
+        for mutant in mutants:
+            if mutant['type'] == 'xmt':
+                if mutant['target'] == '*':
+                    self.xmt_targets.add('*')
+                else:
+                    self.xmt_targets.add(mutant['target'])
+            elif mutant['type'] == 'sdl':
+                self.sdl_targets.update(mutant['target'])
 
     def visit_FunctionDef(self, node):
-        """Visit and transform function definitions"""
-        # Mutant insertion logic for specific functions
-        new_body = []
+        """Handle XMT mutations"""
+        self.generic_visit(node)
         
-        if node.name == 'add' and 'skip-addition' in self.mutants:
-            new_body.append(ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('skip-addition'):\n"
-                f"    print('Mutant skip-addition active, skipping addition')\n"
-                f"    return a"
-            ).body[0])
-
-        if node.name == 'subtract' and 'invert-subtraction' in self.mutants:
-            new_body.append(ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('invert-subtraction'):\n"
-                f"    print('Mutant invert-subtraction active, inverting subtraction')\n"
-                f"    return a + b"
-            ).body[0])
-
-        if node.name == 'multiply' and 'skip-multiplication' in self.mutants:
-            new_body.append(ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('skip-multiplication'):\n"
-                f"    print('Mutant skip-multiplication active, skipping multiplication')\n"
-                f"    return 1"
-            ).body[0])
-
-        if node.name == 'divide' and 'skip-division' in self.mutants:
-            new_body.append(ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('skip-division'):\n"
-                f"    print('Mutant skip-division active, skipping division')\n"
+        # Skip __init__ methods and any other special methods
+        if node.name.startswith('__') and node.name.endswith('__'):
+            return node
+            
+        # Regular function handling
+        if '*' in self.xmt_targets or node.name in self.xmt_targets:
+            mutation_check = ast.parse(
+                f"if {self.plugin_name}.is_mutant_enabled('xmt_{node.name}'):\n"
+                f"    print(f'XMT: Removing body of function {node.name}')\n"
                 f"    return None"
-            ).body[0])
+            ).body[0]
+            node.body.insert(0, mutation_check)
+        
+        return node
 
-        # Append the original function body
-        new_body.extend(node.body)
-        node.body = new_body
+    def visit_For(self, node):
+        """Handle SDL mutations for for statements"""
+        self.generic_visit(node)
+        
+        if 'for' in self.sdl_targets:
+            mutation_check = ast.parse(
+                f"if {self.plugin_name}.is_mutant_enabled('sdl_for'):\n"
+                f"    print('SDL: Skipping for loop')\n"
+                f"    pass"
+            ).body[0]
+            return ast.If(
+                test=mutation_check.test,
+                body=mutation_check.body,
+                orelse=[node]  # Keep original for loop in else branch
+            )
+        
+        return node
 
+    def visit_If(self, node):
+        """Handle SDL mutations for if statements"""
+        self.generic_visit(node)
+        
+        if 'if' in self.sdl_targets:
+            mutation_check = ast.parse(
+                f"if {self.plugin_name}.is_mutant_enabled('sdl_if'):\n"
+                f"    print('SDL: Skipping if statement')\n"
+                f"    pass"
+            ).body[0]
+            return ast.If(
+                test=mutation_check.test,
+                body=mutation_check.body,
+                orelse=[node]  # Keep original if statement in else branch
+            )
+        
         return node
 
 def load_mutants(mutant_file):
