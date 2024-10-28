@@ -62,14 +62,14 @@ def main():
         logger.error(f"Error during testing: {str(e)}")
         raise
 
-    #finally:
+    finally:
         # Restore original file
-        #logger.info("Restoring original file...")
-        #restore_original(target_file, backup_path)
+        logger.info("Restoring original file...")
+        restore_original(target_file, backup_path)
         
         # Clean up backup file
-        #if os.path.exists(backup_path):
-            #os.remove(backup_path)
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
 
 if __name__ == "__main__":
     main()
