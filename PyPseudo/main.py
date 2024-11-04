@@ -4,11 +4,147 @@ import logging
 import shutil
 import os
 import json
+import ast
 from mutation_plugin import MutationPlugin
 from instrumentation import run_instrumentation, restore_original
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def analyze_code_for_mutations(file_path):
+    """Analyze code and return available mutation points"""
+    with open(file_path, 'r') as f:
+        source_code = f.read()
+    
+    tree = ast.parse(source_code)
+    
+    class MutationAnalyzer(ast.NodeVisitor):
+        def __init__(self):
+            self.mutations = {
+                'xmt': set(),  # Function names
+                'sdl': {
+                    'for': [],
+                    'if': [],
+                }
+            }
+            self.current_function = None
+            
+        def visit_FunctionDef(self, node):
+            if not (node.name.startswith('__') and node.name.endswith('__')):
+                self.mutations['xmt'].add(node.name)
+            self.current_function = node.name
+            self.generic_visit(node)
+            
+        def visit_For(self, node):
+            self.mutations['sdl']['for'].append({
+                'function': self.current_function,
+                'lineno': node.lineno
+            })
+            self.generic_visit(node)
+            
+        def visit_If(self, node):
+            self.mutations['sdl']['if'].append({
+                'function': self.current_function,
+                'lineno': node.lineno
+            })
+            self.generic_visit(node)
+    
+    analyzer = MutationAnalyzer()
+    analyzer.visit(tree)
+    return analyzer.mutations
+
+def list_available_mutations(args):
+    """List all available mutation points in the code"""
+    target_file = 'simplePro/calculator.py'
+    mutations = analyze_code_for_mutations(target_file)
+    
+    print("\nAvailable Mutations:")
+    print("-" * 50)
+    print("\nXMT Mutations (Function Level):")
+    for func in sorted(mutations['xmt']):
+        print(f"  - xmt_{func}")
+    
+    print("\nSDL Mutations (Statement Level):")
+    for stmt_type, locations in mutations['sdl'].items():
+        print(f"\n  {stmt_type.upper()} Statements:")
+        for loc in locations:
+            print(f"    - sdl_{stmt_type} in {loc['function']} (line {loc['lineno']})")
+
+def run_single_mutation_test(mutant_file, mutation_id, pytest_args):
+    """Run tests with a single mutation enabled"""
+    with open(mutant_file, 'r') as f:
+        mutants_data = json.load(f)
+    
+    # Configure for single mutation
+    mutants_data['enable_mutation'] = True
+    if mutation_id.startswith('xmt_'):
+        function_name = mutation_id.replace('xmt_', '')
+        mutants_data['enabled_mutants'] = [{'type': 'xmt', 'target': function_name}]
+    else:
+        stmt_type = mutation_id.replace('sdl_', '')
+        mutants_data['enabled_mutants'] = [{'type': 'sdl', 'target': [stmt_type]}]
+    
+    with open(mutant_file, 'w') as f:
+        json.dump(mutants_data, f, indent=4)
+    
+    # Run tests and collect results
+    result = run_tests(mutant_file, pytest_args)
+    return result
+
+def run_all_mutations(args, pytest_args):
+    """Run tests with each mutation one by one"""
+    target_file = 'simplePro/calculator.py'
+    mutations = analyze_code_for_mutations(target_file)
+    results = {}
+    
+    # Run XMT mutations
+    for func in mutations['xmt']:
+        mutation_id = f"xmt_{func}"
+        print(f"\nTesting mutation: {mutation_id}")
+        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
+        results[mutation_id] = {
+            'passed': result == 0,
+            'function': func,
+            'type': 'xmt'
+        }
+    
+    # Run SDL mutations
+    for stmt_type, locations in mutations['sdl'].items():
+        mutation_id = f"sdl_{stmt_type}"
+        print(f"\nTesting mutation: {mutation_id}")
+        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
+        results[mutation_id] = {
+            'passed': result == 0,
+            'locations': locations,
+            'type': 'sdl'
+        }
+    
+    return results
+
+def generate_mutation_report(results):
+    """Generate a detailed report of mutation testing results"""
+    report = {
+        'summary': {
+            'total_mutations': len(results),
+            'killed_mutations': sum(1 for r in results.values() if not r['passed']),
+            'survived_mutations': sum(1 for r in results.values() if r['passed'])
+        },
+        'mutations': results
+    }
+    
+    # Write detailed report
+    with open('mutation_report.json', 'w') as f:
+        json.dump(report, f, indent=4)
+    
+    # Print summary
+    print("\nMutation Testing Report")
+    print("-" * 50)
+    print(f"Total Mutations: {report['summary']['total_mutations']}")
+    print(f"Killed Mutations: {report['summary']['killed_mutations']}")
+    print(f"Survived Mutations: {report['summary']['survived_mutations']}")
+    print("\nDetailed results written to mutation_report.json")
+
+
 
 def run_tests(mutant_file, pytest_args):
     """Run tests with the mutation plugin"""
@@ -18,13 +154,29 @@ def run_tests(mutant_file, pytest_args):
 
 def filter_mutations(mutants_data, args):
     """Filter mutations based on command line arguments"""
-    # Always enable mutations when filtering
-    mutants_data['enable_mutation'] = True
+    # Handle mutation enabling/disabling
+    if args.disable_mutations:
+        mutants_data['enable_mutation'] = False
+    else:
+        mutants_data['enable_mutation'] = True
+    
+    # Handle single mutant case
+    if args.single_mutant:
+        # Determine mutant type from the ID
+        mutant_type = 'xmt' if args.single_mutant.startswith('xmt_') else 'sdl'
+        
+        if mutant_type == 'xmt':
+            function_name = args.single_mutant.replace('xmt_', '')
+            mutants_data['enabled_mutants'] = [{'type': 'xmt', 'target': function_name}]
+        else:
+            stmt_type = args.single_mutant.replace('sdl_', '')
+            mutants_data['enabled_mutants'] = [{'type': 'sdl', 'target': [stmt_type]}]
+        return mutants_data
     
     if not (args.xmt or args.sdl):  # If neither specified, keep all
         mutants_data['enabled_mutants'] = [
-            {'type': 'xmt', 'target': '*'},  # Enable XMT for all functions
-            {'type': 'sdl', 'target': ['for', 'if']}  # Enable SDL for for/if statements
+            {'type': 'xmt', 'target': '*'},
+            {'type': 'sdl', 'target': ['for', 'if']}
         ]
         return mutants_data
         
@@ -48,6 +200,10 @@ def main():
                           help='Run mutation testing')
     mode_group.add_argument('--restore', action='store_true',
                           help='Restore code to original state')
+    mode_group.add_argument('--list-mutations', action='store_true',
+                          help='List all available mutation points in the code')
+    mode_group.add_argument('--run-all-mutations', action='store_true',
+                          help='Run tests with each mutation one by one')
     
     # Mutation type flags
     parser.add_argument('--xmt', action='store_true',
@@ -55,7 +211,15 @@ def main():
     parser.add_argument('--sdl', action='store_true',
                        help='Use statement deletion testing only')
     
-    # Required and existing arguments
+    # Mutation control flags
+    parser.add_argument('--enable-mutations', action='store_true',
+                       help='Enable mutations during test run')
+    parser.add_argument('--disable-mutations', action='store_true',
+                       help='Disable all mutations during test run')
+    parser.add_argument('--single-mutant', 
+                       help='Run tests with only specified mutant enabled (e.g., "xmt_add" or "sdl_for")')
+    
+    # Your existing arguments remain the same...
     parser.add_argument('--mutant-file', required=True, help='Path to the mutant file.')
     parser.add_argument('--json-report', action='store_true', help='Generate a JSON report.')
     parser.add_argument('--json-report-file', help='Path to save the JSON report.')
@@ -64,12 +228,32 @@ def main():
 
     args = parser.parse_args()
 
+    # Prepare pytest arguments
+    pytest_args = []
+    if args.json_report:
+        pytest_args.append('--json-report')
+    if args.json_report_file:
+        pytest_args.extend(['--json-report-file', args.json_report_file])
+    if args.cov:
+        pytest_args.extend(['--cov', args.cov])
+    if args.cov_report:
+        pytest_args.extend(['--cov-report', args.cov_report])
+
     target_file = 'simplePro/calculator.py'
     backup_path = f"{target_file}.backup"
     original_backup_path = f"{target_file}.original"
-    original_mutants = None  # Initialize here
+    original_mutants = None #Intialize here 
 
     try:
+        if args.list_mutations:
+            list_available_mutations(args)
+            return
+
+        if args.run_all_mutations:
+            results = run_all_mutations(args, pytest_args)
+            generate_mutation_report(results)
+            return
+        
         if args.restore:
             logger.info(f"Restoring {target_file} to original state")
             if os.path.exists(original_backup_path):

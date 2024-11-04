@@ -51,8 +51,15 @@ class MutationPlugin:
                 mutants_data = json.load(f)
                 self.mutation_enabled = mutants_data.get('enable_mutation', False)
                 if self.mutation_enabled:
+                    print("Mutations enabled.")
                     self.enabled_mutants = mutants_data.get('enabled_mutants', [])
                     self._process_mutants(self.enabled_mutants)
+                    if self.enabled_mutants:
+                        print("Active mutations:")
+                        for mutant in self.enabled_mutants:
+                            print(f"  - Type: {mutant['type']}, Target: {mutant['target']}")
+                else:
+                    print("Mutations disabled.")
 
     def is_mutant_enabled(self, mutant_id):
         """Check if mutation is enabled for given ID"""
