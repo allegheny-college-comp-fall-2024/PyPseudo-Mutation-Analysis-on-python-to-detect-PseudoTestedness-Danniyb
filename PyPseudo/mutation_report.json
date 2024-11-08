@@ -1,0 +1,122 @@
+{
+    "summary": {
+        "total_mutations": 9,
+        "killed_mutations": 4,
+        "survived_mutations": 5,
+        "errored_mutations": 0,
+        "xmt_results": {
+            "xmt_add": {
+                "killed": true,
+                "error": null,
+                "type": "xmt",
+                "target": "add"
+            },
+            "xmt_divide": {
+                "killed": false,
+                "error": null,
+                "type": "xmt",
+                "target": "divide"
+            },
+            "xmt_modulus": {
+                "killed": false,
+                "error": null,
+                "type": "xmt",
+                "target": "modulus"
+            },
+            "xmt_multiply": {
+                "killed": false,
+                "error": null,
+                "type": "xmt",
+                "target": "multiply"
+            },
+            "xmt_power": {
+                "killed": false,
+                "error": null,
+                "type": "xmt",
+                "target": "power"
+            },
+            "xmt_square_root": {
+                "killed": false,
+                "error": null,
+                "type": "xmt",
+                "target": "square"
+            },
+            "xmt_subtract": {
+                "killed": true,
+                "error": null,
+                "type": "xmt",
+                "target": "subtract"
+            }
+        },
+        "sdl_results": {
+            "sdl_for": {
+                "killed": true,
+                "error": null,
+                "type": "sdl",
+                "target": "for"
+            },
+            "sdl_if": {
+                "killed": true,
+                "error": null,
+                "type": "sdl",
+                "target": "if"
+            }
+        }
+    },
+    "mutations": {
+        "xmt_add": {
+            "killed": true,
+            "error": null,
+            "type": "xmt",
+            "target": "add"
+        },
+        "xmt_divide": {
+            "killed": false,
+            "error": null,
+            "type": "xmt",
+            "target": "divide"
+        },
+        "xmt_modulus": {
+            "killed": false,
+            "error": null,
+            "type": "xmt",
+            "target": "modulus"
+        },
+        "xmt_multiply": {
+            "killed": false,
+            "error": null,
+            "type": "xmt",
+            "target": "multiply"
+        },
+        "xmt_power": {
+            "killed": false,
+            "error": null,
+            "type": "xmt",
+            "target": "power"
+        },
+        "xmt_square_root": {
+            "killed": false,
+            "error": null,
+            "type": "xmt",
+            "target": "square"
+        },
+        "xmt_subtract": {
+            "killed": true,
+            "error": null,
+            "type": "xmt",
+            "target": "subtract"
+        },
+        "sdl_for": {
+            "killed": true,
+            "error": null,
+            "type": "sdl",
+            "target": "for"
+        },
+        "sdl_if": {
+            "killed": true,
+            "error": null,
+            "type": "sdl",
+            "target": "if"
+        }
+    }
+}
