@@ -23,32 +23,48 @@ def analyze_code_for_mutations(file_path):
     class MutationAnalyzer(ast.NodeVisitor):
         def __init__(self):
             self.mutations = {
-                'xmt': set(),  # Function names
+                'xmt': [],  # Changed to list to store dictionaries
                 'sdl': {
                     'for': [],
                     'if': [],
                 }
             }
             self.current_function = None
+            self.counters = {
+                'xmt': 1,
+                'for': 1,
+                'if': 1
+            }
             
         def visit_FunctionDef(self, node):
             if not (node.name.startswith('__') and node.name.endswith('__')):
-                self.mutations['xmt'].add(node.name)
+                self.mutations['xmt'].append({
+                    'function': node.name,
+                    'id': f"xmt_{node.name}_{self.counters['xmt']}",
+                    'number': self.counters['xmt']
+                })
+                self.counters['xmt'] += 1
             self.current_function = node.name
             self.generic_visit(node)
             
         def visit_For(self, node):
             self.mutations['sdl']['for'].append({
                 'function': self.current_function,
-                'lineno': node.lineno
+                'lineno': node.lineno,
+                'id': f"sdl_for_{self.counters['for']}",
+                'number': self.counters['for']
             })
+            self.counters['for'] += 1
             self.generic_visit(node)
             
         def visit_If(self, node):
             self.mutations['sdl']['if'].append({
                 'function': self.current_function,
-                'lineno': node.lineno
+                'lineno': node.lineno,
+                'id': f"sdl_if_{self.counters['if']}",
+                'number': self.counters['if']
             })
+            self.counters['if'] += 1
             self.generic_visit(node)
     
     analyzer = MutationAnalyzer()
@@ -63,14 +79,14 @@ def list_available_mutations(args):
     print("\nAvailable Mutations:")
     print("-" * 50)
     print("\nXMT Mutations (Function Level):")
-    for func in sorted(mutations['xmt']):
-        print(f"  - xmt_{func}")
+    for mut in sorted(mutations['xmt'], key=lambda x: x['function']):
+        print(f"  - {mut['id']}")
     
     print("\nSDL Mutations (Statement Level):")
     for stmt_type, locations in mutations['sdl'].items():
         print(f"\n  {stmt_type.upper()} Statements:")
-        for loc in locations:
-            print(f"    - sdl_{stmt_type} in {loc['function']} (line {loc['lineno']})")
+        for loc in sorted(locations, key=lambda x: (x['function'], x['lineno'])):
+            print(f"    - {loc['id']} in {loc['function']} (line {loc['lineno']})")
 
 def run_single_mutation_test(mutant_file, mutation_id, pytest_args):
     """Run tests with a single mutation enabled"""
