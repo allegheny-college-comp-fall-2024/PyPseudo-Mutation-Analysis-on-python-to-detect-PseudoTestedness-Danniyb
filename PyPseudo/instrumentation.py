@@ -14,6 +14,7 @@ class MutantInserter(ast.NodeTransformer):
         self.mutants = mutants
         self.xmt_targets = set()
         self.sdl_targets = set()
+        self.counters = {'xmt': 1, 'for': 1, 'if': 1}  # Add counters
         self._process_mutants(mutants)
 
     def _process_mutants(self, mutants):
@@ -42,8 +43,11 @@ class MutantInserter(ast.NodeTransformer):
                     return node  # Skip if mutation is already present
                     
             # Add mutation if not present
+            mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
+            self.counters['xmt'] += 1
+
             mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('xmt_{node.name}'):\n"
+                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
                 f"    print(f'XMT: Removing body of function {node.name}')\n"
                 f"    return None"
             ).body[0]
@@ -54,10 +58,17 @@ class MutantInserter(ast.NodeTransformer):
     def visit_For(self, node):
         """Handle SDL mutations for for statements"""
         self.generic_visit(node)
+
+        for stmt in node.body:
+                if isinstance(stmt, ast.If) and 'is_mutant_enabled' in astor.to_source(stmt):
+                    return node  # Skip if mutation is already present
         
         if 'for' in self.sdl_targets:
+            mutation_id = f"sdl_for_{self.counters['for']}"
+            self.counters['for'] += 1
+            
             mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('sdl_for'):\n"
+                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
                 f"    print('SDL: Skipping for loop')\n"
                 f"    pass"
             ).body[0]
@@ -72,10 +83,17 @@ class MutantInserter(ast.NodeTransformer):
     def visit_If(self, node):
         """Handle SDL mutations for if statements"""
         self.generic_visit(node)
+
+        for stmt in node.body:
+                if isinstance(stmt, ast.If) and 'is_mutant_enabled' in astor.to_source(stmt):
+                    return node  # Skip if mutation is already present
         
         if 'if' in self.sdl_targets:
+            mutation_id = f"sdl_if_{self.counters['if']}"
+            self.counters['if'] += 1
+            
             mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('sdl_if'):\n"
+                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
                 f"    print('SDL: Skipping if statement')\n"
                 f"    pass"
             ).body[0]

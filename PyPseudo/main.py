@@ -5,6 +5,8 @@ import shutil
 import os
 import json
 import ast
+from contextlib import contextmanager
+import signal
 from mutation_plugin import MutationPlugin
 from instrumentation import run_instrumentation, restore_original
 
@@ -150,7 +152,35 @@ def run_tests(mutant_file, pytest_args):
     """Run tests with the mutation plugin"""
     plugin = MutationPlugin(mutant_file)
     plugin.load_mutants()
-    return pytest.main(pytest_args, plugins=[plugin])
+    
+    try:
+        with timeout(30):  # Add 30 second timeout
+            result = pytest.main(pytest_args, plugins=[plugin])
+            return result
+    except TimeoutException:
+        logger.error("Test execution timed out")
+        return 1
+    except Exception as e:
+        logger.error(f"Error during test execution: {str(e)}")
+        return 1
+
+@contextmanager
+def timeout(seconds):
+    def handler(signum, frame):
+        raise TimeoutException()
+    
+    # Set the timeout handler
+    previous_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+class TimeoutException(Exception):
+    pass
 
 def filter_mutations(mutants_data, args):
     """Filter mutations based on command line arguments"""
@@ -162,29 +192,29 @@ def filter_mutations(mutants_data, args):
     
     # Handle single mutant case
     if args.single_mutant:
-        # Determine mutant type from the ID
-        mutant_type = 'xmt' if args.single_mutant.startswith('xmt_') else 'sdl'
+        parts = args.single_mutant.split('_')
+        mut_type = parts[0]
+        target = '_'.join(parts[1:])  # Join remaining parts for numbered mutations
         
-        if mutant_type == 'xmt':
-            function_name = args.single_mutant.replace('xmt_', '')
-            mutants_data['enabled_mutants'] = [{'type': 'xmt', 'target': function_name}]
+        if mut_type == 'xmt':
+            mutants_data['enabled_mutants'] = [{'type': 'xmt', 'target': target}]
         else:
-            stmt_type = args.single_mutant.replace('sdl_', '')
-            mutants_data['enabled_mutants'] = [{'type': 'sdl', 'target': [stmt_type]}]
+            mutants_data['enabled_mutants'] = [{'type': 'sdl', 'target': [target]}]
         return mutants_data
     
-    if not (args.xmt or args.sdl):  # If neither specified, keep all
-        mutants_data['enabled_mutants'] = [
-            {'type': 'xmt', 'target': '*'},
-            {'type': 'sdl', 'target': ['for', 'if']}
-        ]
-        return mutants_data
-        
     filtered_mutants = []
+    if args.sdl:
+        filtered_mutants.append({'type': 'sdl', 'target': ['if']})
+        filtered_mutants.append({'type': 'sdl', 'target': ['for']})
     if args.xmt:
         filtered_mutants.append({'type': 'xmt', 'target': '*'})
-    if args.sdl:
-        filtered_mutants.append({'type': 'sdl', 'target': ['for', 'if']})
+    
+    if not filtered_mutants:
+        filtered_mutants = [
+            {'type': 'xmt', 'target': '*'},
+            {'type': 'sdl', 'target': ['for']},
+            {'type': 'sdl', 'target': ['if']}
+        ]
     
     mutants_data['enabled_mutants'] = filtered_mutants
     return mutants_data

@@ -1,14 +1,9 @@
 {
-    "enable_mutation": false,
+    "enable_mutation": true,
     "enabled_mutants": [
-        {
-            "type": "xmt",
-            "target": "*"
-        },
         {
             "type": "sdl",
             "target": [
-                "for",
                 "if"
             ]
         }

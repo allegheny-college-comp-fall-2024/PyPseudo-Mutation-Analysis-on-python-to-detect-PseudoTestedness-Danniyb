@@ -1,122 +1,164 @@
 {
     "summary": {
         "total_mutations": 9,
-        "killed_mutations": 4,
-        "survived_mutations": 5,
-        "errored_mutations": 0,
-        "xmt_results": {
-            "xmt_add": {
-                "killed": true,
-                "error": null,
-                "type": "xmt",
-                "target": "add"
-            },
-            "xmt_divide": {
-                "killed": false,
-                "error": null,
-                "type": "xmt",
-                "target": "divide"
-            },
-            "xmt_modulus": {
-                "killed": false,
-                "error": null,
-                "type": "xmt",
-                "target": "modulus"
-            },
-            "xmt_multiply": {
-                "killed": false,
-                "error": null,
-                "type": "xmt",
-                "target": "multiply"
-            },
-            "xmt_power": {
-                "killed": false,
-                "error": null,
-                "type": "xmt",
-                "target": "power"
-            },
-            "xmt_square_root": {
-                "killed": false,
-                "error": null,
-                "type": "xmt",
-                "target": "square"
-            },
-            "xmt_subtract": {
-                "killed": true,
-                "error": null,
-                "type": "xmt",
-                "target": "subtract"
-            }
-        },
-        "sdl_results": {
-            "sdl_for": {
-                "killed": true,
-                "error": null,
-                "type": "sdl",
-                "target": "for"
-            },
-            "sdl_if": {
-                "killed": true,
-                "error": null,
-                "type": "sdl",
-                "target": "if"
-            }
-        }
+        "killed_mutations": 0,
+        "survived_mutations": 9
     },
     "mutations": {
-        "xmt_add": {
-            "killed": true,
-            "error": null,
-            "type": "xmt",
-            "target": "add"
-        },
-        "xmt_divide": {
-            "killed": false,
-            "error": null,
-            "type": "xmt",
-            "target": "divide"
-        },
         "xmt_modulus": {
-            "killed": false,
-            "error": null,
-            "type": "xmt",
-            "target": "modulus"
+            "passed": true,
+            "function": "modulus",
+            "type": "xmt"
         },
-        "xmt_multiply": {
-            "killed": false,
-            "error": null,
-            "type": "xmt",
-            "target": "multiply"
-        },
-        "xmt_power": {
-            "killed": false,
-            "error": null,
-            "type": "xmt",
-            "target": "power"
+        "xmt_add": {
+            "passed": true,
+            "function": "add",
+            "type": "xmt"
         },
         "xmt_square_root": {
-            "killed": false,
-            "error": null,
-            "type": "xmt",
-            "target": "square"
+            "passed": true,
+            "function": "square_root",
+            "type": "xmt"
+        },
+        "xmt_divide": {
+            "passed": true,
+            "function": "divide",
+            "type": "xmt"
+        },
+        "xmt_power": {
+            "passed": true,
+            "function": "power",
+            "type": "xmt"
         },
         "xmt_subtract": {
-            "killed": true,
-            "error": null,
-            "type": "xmt",
-            "target": "subtract"
+            "passed": true,
+            "function": "subtract",
+            "type": "xmt"
+        },
+        "xmt_multiply": {
+            "passed": true,
+            "function": "multiply",
+            "type": "xmt"
         },
         "sdl_for": {
-            "killed": true,
-            "error": null,
-            "type": "sdl",
-            "target": "for"
+            "passed": true,
+            "locations": [
+                {
+                    "function": "multiply",
+                    "lineno": 39
+                },
+                {
+                    "function": "power",
+                    "lineno": 95
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 117
+                }
+            ],
+            "type": "sdl"
         },
         "sdl_if": {
-            "killed": true,
-            "error": null,
-            "type": "sdl",
-            "target": "if"
+            "passed": true,
+            "locations": [
+                {
+                    "function": "add",
+                    "lineno": 7
+                },
+                {
+                    "function": "subtract",
+                    "lineno": 20
+                },
+                {
+                    "function": "multiply",
+                    "lineno": 35
+                },
+                {
+                    "function": "multiply",
+                    "lineno": 41
+                },
+                {
+                    "function": "multiply",
+                    "lineno": 44
+                },
+                {
+                    "function": "divide",
+                    "lineno": 49
+                },
+                {
+                    "function": "divide",
+                    "lineno": 52
+                },
+                {
+                    "function": "divide",
+                    "lineno": 60
+                },
+                {
+                    "function": "divide",
+                    "lineno": 63
+                },
+                {
+                    "function": "modulus",
+                    "lineno": 68
+                },
+                {
+                    "function": "modulus",
+                    "lineno": 71
+                },
+                {
+                    "function": "modulus",
+                    "lineno": 77
+                },
+                {
+                    "function": "modulus",
+                    "lineno": 80
+                },
+                {
+                    "function": "power",
+                    "lineno": 85
+                },
+                {
+                    "function": "power",
+                    "lineno": 88
+                },
+                {
+                    "function": "power",
+                    "lineno": 91
+                },
+                {
+                    "function": "power",
+                    "lineno": 97
+                },
+                {
+                    "function": "power",
+                    "lineno": 100
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 105
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 108
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 111
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 114
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 119
+                },
+                {
+                    "function": "square_root",
+                    "lineno": 122
+                }
+            ],
+            "type": "sdl"
         }
     }
 }
