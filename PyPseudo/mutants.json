@@ -9,7 +9,10 @@
             "type": "sdl",
             "target": [
                 "for",
-                "if"
+                "if",
+                "while",
+                "return",
+                "try"
             ]
         }
     ]
