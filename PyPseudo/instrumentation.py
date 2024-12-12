@@ -54,7 +54,7 @@ class MutantInserter(ast.NodeTransformer):
             
         return self.generic_visit(node)
     
-
+                        
     def process_mutants(self):
         for mutant in self.mutants:
             if mutant['type'] == 'xmt':
@@ -64,6 +64,7 @@ class MutantInserter(ast.NodeTransformer):
                     self.xmt_targets.add(mutant['target'])
             elif mutant['type'] == 'sdl':
                 self.sdl_targets.update(mutant['target'])
+
 
     def is_xmt_mutation(self, node):
         """
@@ -77,6 +78,7 @@ class MutantInserter(ast.NodeTransformer):
             except:
                 return False
         return False
+
 
     def visit_FunctionDef(self, node):
         """
@@ -104,6 +106,7 @@ class MutantInserter(ast.NodeTransformer):
             logger.info(f"Added XMT mutation {mutation_id} to function {node.name}")
         
         return node
+
 
     def visit_If(self, node):
         """
@@ -148,6 +151,7 @@ class MutantInserter(ast.NodeTransformer):
         
         return node
 
+
     def visit_For(self, node):
         """
         Handle SDL mutations for for loops while preserving other mutations.
@@ -186,6 +190,7 @@ class MutantInserter(ast.NodeTransformer):
         
         return node
     
+
 def instrument_code(source_code, plugin_name, mutants):
     """
     Main instrumentation function that processes source code and adds mutations.
@@ -214,6 +219,7 @@ def instrument_code(source_code, plugin_name, mutants):
     except Exception as e:
         logger.error(f"Error during instrumentation: {str(e)}")
         raise
+
 
 def run_instrumentation(input_file, mutant_file):
     """
@@ -245,6 +251,7 @@ def run_instrumentation(input_file, mutant_file):
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
         raise
+
 
 def restore_original(file_path, backup_path):
     """Restore the original code from backup"""

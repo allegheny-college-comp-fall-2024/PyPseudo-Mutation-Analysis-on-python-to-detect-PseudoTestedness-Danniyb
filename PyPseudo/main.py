@@ -206,7 +206,7 @@ def analyze_code_for_mutations(file_path):
 
 def list_available_mutations(args):
     """Lists all mutations currently present in the code."""
-    target_file = 'simplePro/calculator.py'
+    target_file = 'simplePro/newtest.py'
     mutations = analyze_code_for_mutations(target_file)
     
     print("\nAvailable Mutations:")
@@ -246,7 +246,7 @@ def list_available_mutations(args):
 
 def run_all_mutations(args, pytest_args):
     """Run tests with each mutation one by one"""
-    target_file = 'simplePro/calculator.py'
+    target_file = 'simplePro/newtest.py'
     mutations = analyze_code_for_mutations(target_file)
     results = {}
     
@@ -299,7 +299,7 @@ def run_all_mutations(args, pytest_args):
 
 def run_all_mutations(args, pytest_args):
     """Run tests with each mutation one by one"""
-    target_file = 'simplePro/calculator.py'
+    target_file = 'simplePro/newtest.py'
     mutations = analyze_code_for_mutations(target_file)
     results = {}
     
@@ -516,7 +516,7 @@ def main():
     if args.cov_report:
         pytest_args.extend(['--cov-report', args.cov_report])
 
-    target_file = 'simplePro/calculator.py'
+    target_file = 'simplePro/newtest.py'
     backup_path = f"{target_file}.backup"
     original_backup_path = f"{target_file}.original"
     original_mutants = None #Intialize here 
