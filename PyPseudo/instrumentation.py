@@ -17,8 +17,43 @@ class MutantInserter(ast.NodeTransformer):
         self.sdl_targets = set()
         self.counters = {'xmt': 1, 'for': 1, 'if': 1}
         self.nodes_visited = {'if': 0, 'for': 0}
+        self.is_class_based = False  # Track if code is class-based
         self.process_mutants()
         logger.info(f"Initialized with targets - XMT: {self.xmt_targets}, SDL: {self.sdl_targets}")
+
+
+    def _check_code_context(self, tree):
+        """Check if code is class-based or procedural"""
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                self.is_class_based = True
+                break
+
+    def _create_mutation_check(self, mutation_id, message):
+        """Create appropriate mutation check based on context"""
+        plugin_ref = "self.plugin" if self.is_class_based else "plugin"
+        return ast.parse(
+            f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
+            f"    print({message!r})\n"
+            f"    return None"
+        ).body[0]
+    
+
+    def visit_Module(self, node):
+        """Add necessary imports for procedural code"""
+        self._check_code_context(node)
+        
+        if not self.is_class_based:
+            # Add imports only for procedural code
+            imports = ast.parse(
+                'from mutation_plugin import MutationPlugin\n'
+                'plugin = MutationPlugin("mutants.json")\n'
+                'plugin.load_mutants()'
+            ).body
+            node.body = imports + node.body
+            
+        return self.generic_visit(node)
+    
 
     def process_mutants(self):
         for mutant in self.mutants:
@@ -62,11 +97,8 @@ class MutantInserter(ast.NodeTransformer):
             mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
             self.counters['xmt'] += 1
 
-            mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
-                f"    print(f'XMT: Removing body of function {node.name}')\n"
-                f"    return None"
-            ).body[0]
+            message = f'XMT: Removing body of function {node.name}'
+            mutation_check = self._create_mutation_check(mutation_id, message)
             
             node.body.insert(0, mutation_check)
             logger.info(f"Added XMT mutation {mutation_id} to function {node.name}")
@@ -152,7 +184,6 @@ def instrument_code(source_code, plugin_name, mutants):
     """
     logger.info("Starting code instrumentation")
     try:
-        # Parse the source code into an AST
         tree = ast.parse(source_code)
         
         # Create and run the mutant inserter
@@ -182,21 +213,21 @@ def run_instrumentation(input_file, mutant_file):
             mutants_data = json.load(f)
             enabled_mutants = mutants_data.get('enabled_mutants', [])
 
-        # Read the source code
+        # Read source code
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Instrument the code
-        mutated_code = instrument_code(source_code, 'self.plugin', enabled_mutants)
+        # Instrument the code - plugin_name passed as generic reference
+        mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
 
-        # Write the instrumented code back
+        # Write instrumented code back
         with open(input_file, 'w') as f:
             f.write(mutated_code)
             
         logger.info(f"Successfully instrumented {input_file}")
             
     except Exception as e:
-        logger.error(f"Error during instrumentation: {str(e)}")
+        logger.error(f"Error during instrumentation: {e}")
         raise
 
 def restore_original(file_path, backup_path):
