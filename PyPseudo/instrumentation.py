@@ -125,18 +125,26 @@ class MutantInserter(ast.NodeTransformer):
             mutation_id = f"sdl_if_{self.counters['if']}"
             self.counters['if'] += 1
             
+            # Create context-aware mutation check
+            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
             mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
+                f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
                 f"    print('SDL: Skipping if statement')\n"
                 f"    pass"
             ).body[0]
             
             logger.info(f"Added SDL mutation {mutation_id} to if statement")
-            return ast.If(
+            
+            # Create if statement with mutated check and original as else
+            mutated_if = ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
                 orelse=[node]
             )
+            
+            # Copy source location info for better error reporting
+            ast.copy_location(mutated_if, node)
+            return mutated_if
         
         return node
 
@@ -147,7 +155,7 @@ class MutantInserter(ast.NodeTransformer):
         self.nodes_visited['for'] += 1
         logger.debug(f"Visiting For node #{self.nodes_visited['for']}")
 
-        # Visit children first
+        # Visit children first to handle any nested mutations
         node = self.generic_visit(node)
         
         # Add SDL mutation if targeted
@@ -155,18 +163,26 @@ class MutantInserter(ast.NodeTransformer):
             mutation_id = f"sdl_for_{self.counters['for']}"
             self.counters['for'] += 1
             
+            # Create context-aware mutation check
+            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
             mutation_check = ast.parse(
-                f"if {self.plugin_name}.is_mutant_enabled('{mutation_id}'):\n"
+                f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
                 f"    print('SDL: Skipping for loop')\n"
                 f"    pass"
             ).body[0]
             
             logger.info(f"Added SDL mutation {mutation_id} to for loop")
-            return ast.If(
+            
+            # Create if statement wrapping the for loop
+            mutated_for = ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
                 orelse=[node]
             )
+            
+            # Copy location information
+            ast.copy_location(mutated_for, node)
+            return mutated_for
         
         return node
     
