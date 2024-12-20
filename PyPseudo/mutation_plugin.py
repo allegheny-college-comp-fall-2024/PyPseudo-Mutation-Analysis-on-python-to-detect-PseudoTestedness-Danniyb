@@ -51,22 +51,36 @@ class MutationPlugin:
                 mutants_data = json.load(f)
                 self.mutation_enabled = mutants_data.get('enable_mutation', False)
                 if self.mutation_enabled:
+                    print("Mutations enabled.")
                     self.enabled_mutants = mutants_data.get('enabled_mutants', [])
                     self._process_mutants(self.enabled_mutants)
+                    if self.enabled_mutants:
+                        print("Active mutations:")
+                        for mutant in self.enabled_mutants:
+                            print(f"  - Type: {mutant['type']}, Target: {mutant['target']}")
+                else:
+                    print("Mutations disabled.")
 
     def is_mutant_enabled(self, mutant_id):
         """Check if mutation is enabled for given ID"""
         if not self.mutation_enabled:
             return False
             
-        # Handle XMT mutations
+        # Handle XMT mutations with numbers
         if mutant_id.startswith('xmt_'):
-            function_name = mutant_id.replace('xmt_', '')
-            return '*' in self.xmt_targets or function_name in self.xmt_targets
+            # Extract function name and number if present
+            parts = mutant_id.replace('xmt_', '').split('_')
+            func_name = parts[0]
+            if len(parts) > 1:  # Has number
+                return f"{func_name}_{parts[1]}" in self.xmt_targets or '*' in self.xmt_targets
+            return func_name in self.xmt_targets or '*' in self.xmt_targets
             
-        # Handle SDL mutations
+        # Handle SDL mutations with numbers
         if mutant_id.startswith('sdl_'):
-            stmt_type = mutant_id.replace('sdl_', '')
+            parts = mutant_id.replace('sdl_', '').split('_')
+            stmt_type = parts[0]
+            if len(parts) > 1:  # Has number
+                return f"{stmt_type}_{parts[1]}" in self.sdl_targets
             return stmt_type in self.sdl_targets
             
         return False
