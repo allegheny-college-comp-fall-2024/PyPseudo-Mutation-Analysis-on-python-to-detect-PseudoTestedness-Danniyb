@@ -297,7 +297,132 @@ def list_available_mutations(args):
     else:
         print("    None found")
 
+def run_single_mutation_test(args, mutation_id, pytest_args):
+    """
+    Run tests with a single mutation enabled.
+    
+    Args:
+        args: Command line arguments
+        mutation_id: ID of mutation to test
+        pytest_args: Additional pytest arguments
+    
+    Returns:
+        int: Test result (0 for pass, non-zero for fail)
+    """
+    try:
+        # Create mutation config with only the specified mutation
+        mutants_config = {
+            'enable_mutation': True,
+            'enabled_mutants': [{'type': mutation_id.split('_')[0], 'target': mutation_id}]
+        }
+        
+        # Write temporary mutation config
+        with open(args.mutant_file, 'w') as f:
+            json.dump(mutants_config, f, indent=4)
+            
+        # Run tests
+        return run_tests(args.mutant_file, pytest_args)
+        
+    except Exception as e:
+        logger.error(f"Error running mutation {mutation_id}: {e}")
+        return 1
 
+def run_all_mutations(args, pytest_args):
+    """Run tests with each mutation one by one"""
+    # Determine target path and get mutations
+    target_path = args.project_path if args.project_path else 'simplePro/newtest.py'
+    all_mutations = {
+        'xmt': [],
+        'sdl': {'for': [], 'if': []}
+    }
+    
+    # Collect mutations from all files
+    for file_path in get_target_files(target_path):
+        if '.pypseudo' not in str(file_path):
+            try:
+                file_mutations = analyze_code_for_mutations(file_path)
+                # Add file info to mutations
+                for mut in file_mutations['xmt']:
+                    mut['file'] = str(file_path)
+                all_mutations['xmt'].extend(file_mutations['xmt'])
+                
+                for stmt_type in ['for', 'if']:
+                    for mut in file_mutations['sdl'][stmt_type]:
+                        mut['file'] = str(file_path)
+                    all_mutations['sdl'][stmt_type].extend(file_mutations['sdl'][stmt_type])
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing {file_path}: {e}")
+                continue
+    
+    results = {}
+    
+    # Run XMT mutations
+    print("\nRunning XMT mutations:")
+    for mut in sorted(all_mutations['xmt'], key=lambda x: (x['file'], x['function'], x['number'])):
+        mutation_id = mut['id']
+        print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
+        result = run_single_mutation_test(args, mutation_id, pytest_args)
+        results[mutation_id] = {
+            'passed': result == 0,
+            'file': mut['file'],
+            'function': mut['function'],
+            'type': 'xmt',
+            'number': mut['number']
+        }
+    
+    # Run SDL mutations
+    print("\nRunning SDL mutations:")
+    
+    # Process both for and if mutations
+    for stmt_type in ['for', 'if']:
+        print(f"\nProcessing {stmt_type.upper()} statement mutations:")
+        for mut in sorted(all_mutations['sdl'][stmt_type], 
+                         key=lambda x: (x['file'], x['function'], x['lineno'])):
+            mutation_id = mut['id']
+            print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
+            result = run_single_mutation_test(args, mutation_id, pytest_args)
+            results[mutation_id] = {
+                'passed': result == 0,
+                'file': mut['file'],
+                'function': mut['function'],
+                'type': 'sdl',
+                'statement_type': stmt_type,
+                'line': mut['lineno'],
+                'number': mut.get('number', 0)
+            }
+    
+    # Generate report
+    killed = sum(1 for r in results.values() if not r['passed'])
+    survived = sum(1 for r in results.values() if r['passed'])
+    
+    report = {
+        'summary': {
+            'total_mutations': len(results),
+            'killed_mutations': killed,
+            'survived_mutations': survived
+        },
+        'mutations': results,
+        'metadata': {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'target': str(target_path)
+        }
+    }
+    
+    # Write report
+    report_path = 'mutation_report.json'
+    with open(report_path, 'w') as f:
+        json.dump(report, f, indent=4)
+    
+    # Print summary
+    print("\nMutation Testing Report")
+    print("-" * 50)
+    print(f"Total Mutations: {len(results)}")
+    print(f"Killed Mutations: {killed}")
+    print(f"Survived Mutations: {survived}")
+    print(f"\nDetailed results written to {report_path}")
+    
+    return results
 
 def generate_mutation_report(results):
     """Generate a detailed report of mutation testing results"""
