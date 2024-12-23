@@ -447,8 +447,6 @@ def generate_mutation_report(results):
     print(f"Survived Mutations: {report['summary']['survived_mutations']}")
     print("\nDetailed results written to mutation_report.json")
 
-
-
 def run_tests(mutant_file, pytest_args):
     """Run tests with the mutation plugin"""
     plugin = MutationPlugin(mutant_file)
