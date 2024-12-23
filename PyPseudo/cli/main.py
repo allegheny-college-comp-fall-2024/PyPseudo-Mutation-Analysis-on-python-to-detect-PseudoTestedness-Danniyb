@@ -482,13 +482,17 @@ def main():
     mode_group.add_argument('--run-all-mutations', action='store_true',
                           help='Run tests with each mutation one by one')
     
-    # Mutation type flags
+    # project path argument
+    parser.add_argument('--project-path',
+                       help='Path to the project to analyze. If not provided, will use default target file.')
+    
+    # mutation type flags
     parser.add_argument('--xmt', action='store_true',
                        help='Use extreme mutation testing only')
     parser.add_argument('--sdl', action='store_true',
                        help='Use statement deletion testing only')
     
-    # Mutation control flags
+    # mutation control flags
     parser.add_argument('--enable-mutations', action='store_true',
                        help='Enable mutations during test run')
     parser.add_argument('--disable-mutations', action='store_true',
@@ -496,7 +500,7 @@ def main():
     parser.add_argument('--single-mutant', 
                        help='Run tests with only specified mutant enabled (e.g., "xmt_add" or "sdl_for")')
     
-    # Your existing arguments remain the same...
+    # Reporting arguments
     parser.add_argument('--mutant-file', required=True, help='Path to the mutant file.')
     parser.add_argument('--json-report', action='store_true', help='Generate a JSON report.')
     parser.add_argument('--json-report-file', help='Path to save the JSON report.')
@@ -516,41 +520,38 @@ def main():
     if args.cov_report:
         pytest_args.extend(['--cov-report', args.cov_report])
 
-    target_file = 'simplePro/newtest.py'
-    backup_path = f"{target_file}.backup"
-    original_backup_path = f"{target_file}.original"
-    original_mutants = None #Intialize here 
+    # Set target paths
+    target_file = args.project_path if args.project_path else 'simplePro/newtest.py'
+    is_project_mode = args.project_path is not None
+    
+    if is_project_mode:
+        working_dir = Path(target_file).parent / f"{Path(target_file).name}_pypseudo_work"
+    else:
+        backup_path = f"{target_file}.backup"
+        original_backup_path = f"{target_file}.original"
+    
+    original_mutants = None #Initialize here 
 
     try:
         if args.list_mutations:
-            list_available_mutations(args)
+            target = working_dir if is_project_mode else target_file
+            list_available_mutations(args, target)
             return
 
         if args.run_all_mutations:
-            results = run_all_mutations(args, pytest_args)
+            target = working_dir if is_project_mode else target_file
+            results = run_all_mutations(args, pytest_args, target)
             generate_mutation_report(results)
             return
         
         if args.restore:
-            logger.info(f"Restoring {target_file} to original state")
-            if os.path.exists(original_backup_path):
-                shutil.copy2(original_backup_path, target_file)
-                os.remove(original_backup_path)
-                if os.path.exists(backup_path):
-                    os.remove(backup_path)
-                logger.info(f"Successfully restored {target_file} to original state")
+            if is_project_mode:
+                logger.info(f"Restoring project {target_file}")
+                restore_project(target_file)
             else:
-                logger.warning("No original backup found. Cannot restore to original state.")
+                logger.info(f"Restoring {target_file} to original state")
+                restore_original(target_file, original_backup_path)
             return
-
-        # Create original backup if it doesn't exist
-        if not os.path.exists(original_backup_path):
-            logger.info(f"Creating original backup of {target_file}")
-            shutil.copy2(target_file, original_backup_path)
-
-        # Create working backup
-        logger.info(f"Creating working backup of {target_file}")
-        shutil.copy2(target_file, backup_path)
 
         # Load and filter mutations based on flags
         with open(args.mutant_file, 'r') as f:
@@ -563,33 +564,45 @@ def main():
         with open(args.mutant_file, 'w') as f:
             json.dump(filtered_mutants, f, indent=4)
 
-        # Run instrumentation
-        logger.info("Running instrumentation...")
-        run_instrumentation(target_file, args.mutant_file)
-
         if args.instrument:
+            logger.info("Running instrumentation...")
+            if is_project_mode:
+                process_project(target_file, args.mutant_file)
+            else:
+                # Create original backup if it doesn't exist
+                if not os.path.exists(original_backup_path):
+                    logger.info(f"Creating original backup of {target_file}")
+                    shutil.copy2(target_file, original_backup_path)
+
+                # Create working backup
+                logger.info(f"Creating working backup of {target_file}")
+                shutil.copy2(target_file, backup_path)
+                
+                run_instrumentation(target_file, args.mutant_file)
+            
             logger.info("Instrumentation complete")
             return
 
         if args.run:
-            # Run tests
             logger.info("Running tests...")
-            result = run_tests(args.mutant_file, pytest_args)
+            target = working_dir if is_project_mode else target_file
+            result = run_tests(args.mutant_file, pytest_args, target)
 
             if result == 0:
                 logger.info("All tests passed")
             else:
                 logger.warning("Some tests failed")
 
-            # Restore from working backup after test run
-            logger.info("Restoring from working backup...")
-            if os.path.exists(backup_path):
-                shutil.copy2(backup_path, target_file)
-                os.remove(backup_path)
+            # Restore from backup for file mode
+            if not is_project_mode:
+                logger.info("Restoring from working backup...")
+                if os.path.exists(backup_path):
+                    shutil.copy2(backup_path, target_file)
+                    os.remove(backup_path)
 
     except Exception as e:
         logger.error(f"Error during execution: {str(e)}")
-        if os.path.exists(original_backup_path):
+        if not is_project_mode and os.path.exists(original_backup_path):
             logger.info("Attempting to restore from original backup after error...")
             shutil.copy2(original_backup_path, target_file)
             if os.path.exists(backup_path):

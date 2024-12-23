@@ -288,7 +288,7 @@ def process_project(project_path, mutant_file):
 
 
 def restore_original(file_path, backup_path):
-    """Restore the original code from backup"""
+    """Restore the original code from backup - file-based restore"""
     try:
         if os.path.exists(backup_path):
             # Read backup content
@@ -306,4 +306,23 @@ def restore_original(file_path, backup_path):
             logger.warning(f"No backup file found at {backup_path}")
     except Exception as e:
         logger.error(f"Error restoring original code: {e}")
+        raise
+
+def restore_project(project_path):
+    """Restore a project to its original state"""
+    try:
+        # Get paths
+        original_path = Path(project_path)
+        working_dir = original_path.parent / f"{original_path.name}_pypseudo_work"
+        
+        if not working_dir.exists():
+            logger.warning(f"No instrumented version found at {working_dir}")
+            return
+            
+        # Clean up working directory
+        shutil.rmtree(working_dir)
+        logger.info(f"Successfully cleaned up instrumented project at {working_dir}")
+        
+    except Exception as e:
+        logger.error(f"Error restoring project: {e}")
         raise
