@@ -1,0 +1,8 @@
+{
+    "summary": {
+        "total_mutations": 0,
+        "killed_mutations": 0,
+        "survived_mutations": 0
+    },
+    "mutations": {}
+}
