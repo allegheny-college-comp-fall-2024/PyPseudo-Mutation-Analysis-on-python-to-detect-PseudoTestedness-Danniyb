@@ -7,8 +7,8 @@ import json
 import ast
 from contextlib import contextmanager
 import signal
-from mutation_plugin import MutationPlugin
-from instrumentation import run_instrumentation, restore_original
+from core.mutation_plugin import MutationPlugin
+from core.instrumentation import run_instrumentation, restore_original
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,19 +45,21 @@ class MutationAnalyzer(ast.NodeVisitor):
             test_node: The AST node containing the test condition
                 
         Returns:
-            tuple: (mutation_type, mutation_id) or (None, None) if not a mutation
+            tuple: (mutation_type, mutation_id, number) or (None, None, None) if not a mutation
         """
         try:
             # We need to handle the case where test_node might be None
             if not isinstance(test_node, ast.If):
-                return None, None
+                return None, None, None
                 
             # Get the test condition's source
             test_str = astor.to_source(test_node.test).strip()
             
-            # Check for mutation pattern - specifically looking for 'self.plugin.is_mutant_enabled'
-            if 'self.plugin.is_mutant_enabled' not in test_str:
-                return None, None
+            # Check for mutation pattern - now checks both forms
+            if not ('self.plugin.is_mutant_enabled' in test_str or 
+                   'plugin.is_mutant_enabled' in test_str or
+                   'is_mutant_enabled' in test_str):
+                return None, None, None
             
             # Extract mutation ID - extract text between quotes
             start_quote = test_str.find("'") + 1
@@ -186,7 +188,7 @@ def analyze_code_for_mutations(file_path):
         # Set up parent references
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
-                child.parent = parent
+                setattr(child, 'parent', parent)
                 
         # Analyze the AST
         analyzer = MutationAnalyzer()
@@ -200,24 +202,75 @@ def analyze_code_for_mutations(file_path):
         return analyzer.mutations
         
     except Exception as e:
-        logger.error(f"Error analyzing mutations: {str(e)}")
+        logger.error(f"Error analyzing mutations in {file_path}: {str(e)}")
         raise
 
+def get_target_files(path):
+    """
+    Get list of Python files to analyze.
+    
+    Args:
+        path: Path to file or directory
+        
+    Returns:
+        list: List of Python file paths
+    """
+    path = Path(path)
+    if path.is_file():
+        return [path]
+    elif path.is_dir():
+        return list(path.glob("**/*.py"))
+    return []
 
 def list_available_mutations(args):
     """Lists all mutations currently present in the code."""
-    target_file = 'simplePro/newtest.py'
-    mutations = analyze_code_for_mutations(target_file)
+    # Determine target path
+    target_path = args.project_path if args.project_path else 'simplePro/newtest.py'
     
+    # Get list of files to analyze
+    files_to_analyze = get_target_files(target_path)
+    
+    # Initialize combined mutations dict
+    combined_mutations = {
+        'xmt': [],
+        'sdl': {
+            'for': [],
+            'if': []
+        }
+    }
+    
+    # Analyze each file
+    for file_path in files_to_analyze:
+        if '.pypseudo' not in str(file_path):  # Skip support files
+            try:
+                file_mutations = analyze_code_for_mutations(file_path)
+                # Add file path to mutation info
+                for mut in file_mutations['xmt']:
+                    mut['file'] = str(file_path)
+                for mut in file_mutations['sdl']['for']:
+                    mut['file'] = str(file_path)
+                for mut in file_mutations['sdl']['if']:
+                    mut['file'] = str(file_path)
+                
+                # Combine mutations
+                combined_mutations['xmt'].extend(file_mutations['xmt'])
+                combined_mutations['sdl']['for'].extend(file_mutations['sdl']['for'])
+                combined_mutations['sdl']['if'].extend(file_mutations['sdl']['if'])
+            except Exception as e:
+                logger.error(f"Error analyzing {file_path}: {e}")
+                continue
+    
+    # Display results
     print("\nAvailable Mutations:")
     print("-" * 50)
     
     # Display XMT mutations
     print("\nXMT Mutations (Function Level):")
-    if mutations['xmt']:
-        sorted_xmt = sorted(mutations['xmt'], key=lambda x: x['id'])
+    if combined_mutations['xmt']:
+        sorted_xmt = sorted(combined_mutations['xmt'], 
+                          key=lambda x: (x['file'], x['function'], x.get('number', 0)))
         for mut in sorted_xmt:
-            print(f"  - {mut['id']} in {mut['function']}")
+            print(f"  - {mut['id']} in {mut['function']} ({mut['file']})")
     else:
         print("  None found")
     
@@ -226,149 +279,25 @@ def list_available_mutations(args):
     
     # For loop mutations
     print("\n  FOR Statements:")
-    if mutations['sdl']['for']:
-        sorted_for = sorted(mutations['sdl']['for'], 
-                          key=lambda x: (x['function'], x['lineno']))
+    if combined_mutations['sdl']['for']:
+        sorted_for = sorted(combined_mutations['sdl']['for'], 
+                          key=lambda x: (x['file'], x['function'], x['lineno']))
         for mut in sorted_for:
-            print(f"    - {mut['id']} in {mut['function']} (line {mut['lineno']})")
+            print(f"    - {mut['id']} in {mut['function']} at line {mut['lineno']} ({mut['file']})")
     else:
         print("    None found")
     
     # If statement mutations
     print("\n  IF Statements:")
-    if mutations['sdl']['if']:
-        sorted_if = sorted(mutations['sdl']['if'], 
-                         key=lambda x: (x['function'], x['lineno']))
+    if combined_mutations['sdl']['if']:
+        sorted_if = sorted(combined_mutations['sdl']['if'], 
+                         key=lambda x: (x['file'], x['function'], x['lineno']))
         for mut in sorted_if:
-            print(f"    - {mut['id']} in {mut['function']} (line {mut['lineno']})")
+            print(f"    - {mut['id']} in {mut['function']} at line {mut['lineno']} ({mut['file']})")
     else:
         print("    None found")
 
-def run_all_mutations(args, pytest_args):
-    """Run tests with each mutation one by one"""
-    target_file = 'simplePro/newtest.py'
-    mutations = analyze_code_for_mutations(target_file)
-    results = {}
-    
-    # Run XMT mutations
-    print("\nRunning XMT mutations:")
-    for mut in sorted(mutations['xmt'], key=lambda x: x['number']):
-        mutation_id = mut['id']
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': mut['function'],
-            'type': 'xmt',
-            'number': mut['number']
-        }
-    
-    # Run SDL mutations
-    print("\nRunning SDL mutations:")
-    
-    # For loop mutations
-    for mut in sorted(mutations['sdl']['for'], key=lambda x: x['number']):
-        mutation_id = mut['id']
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': mut['function'],
-            'type': 'sdl',
-            'statement_type': 'for',
-            'line': mut['lineno'],
-            'number': mut['number']
-        }
-    
-    # If statement mutations
-    for mut in sorted(mutations['sdl']['if'], key=lambda x: x['number']):
-        mutation_id = mut['id']
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': mut['function'],
-            'type': 'sdl',
-            'statement_type': 'if',
-            'line': mut['lineno'],
-            'number': mut['number']
-        }
-    
-    generate_mutation_report(results)
-    return results
 
-def run_all_mutations(args, pytest_args):
-    """Run tests with each mutation one by one"""
-    target_file = 'simplePro/newtest.py'
-    mutations = analyze_code_for_mutations(target_file)
-    results = {}
-    
-    # Run XMT mutations
-    print("\nRunning XMT mutations:")
-    for mut in sorted(mutations['xmt'], key=lambda x: x['function']):
-        mutation_id = mut['id']  # Already in correct format 'xmt_name_number'
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': mut['function'],
-            'type': 'xmt',
-            'number': mut['number']
-        }
-    
-    # Run SDL mutations
-    print("\nRunning SDL mutations:")
-    
-    # For loop mutations
-    for loc in sorted(mutations['sdl']['for'], key=lambda x: (x['function'], x['lineno'])):
-        mutation_id = loc['id']  # Already in format 'sdl_for_number'
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': loc['function'],
-            'type': 'sdl',
-            'statement_type': 'for',
-            'line': loc['lineno'],
-            'number': loc['number']
-        }
-    
-    # If statement mutations
-    for loc in sorted(mutations['sdl']['if'], key=lambda x: (x['function'], x['lineno'])):
-        mutation_id = loc['id']  # Already in format 'sdl_if_number'
-        print(f"\nTesting mutation: {mutation_id}")
-        result = run_single_mutation_test(args.mutant_file, mutation_id, pytest_args)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'function': loc['function'],
-            'type': 'sdl',
-            'statement_type': 'if',
-            'line': loc['lineno'],
-            'number': loc['number']
-        }
-    
-    # Generate report
-    killed = sum(1 for r in results.values() if not r['passed'])
-    survived = sum(1 for r in results.values() if r['passed'])
-    
-    print("\nMutation Testing Report")
-    print("-" * 50)
-    print(f"Total Mutations: {len(results)}")
-    print(f"Killed Mutations: {killed}")
-    print(f"Survived Mutations: {survived}")
-    print("\nDetailed results written to mutation_report.json")
-    
-    with open('mutation_report.json', 'w') as f:
-        json.dump({
-            'summary': {
-                'total_mutations': len(results),
-                'killed_mutations': killed,
-                'survived_mutations': survived
-            },
-            'mutations': results
-        }, f, indent=4)
-    
-    return results
 
 def generate_mutation_report(results):
     """Generate a detailed report of mutation testing results"""
