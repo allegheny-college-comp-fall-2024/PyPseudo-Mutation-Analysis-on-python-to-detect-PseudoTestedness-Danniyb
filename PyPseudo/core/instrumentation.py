@@ -3,6 +3,8 @@ import astor
 import json
 import logging
 import os
+from pathlib import Path
+from .utils import setup_project_environment, inject_mutation_support, copy_support_files
 
 # Configure logging for better debugging and monitoring
 logging.basicConfig(level=logging.INFO)
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 class MutantInserter(ast.NodeTransformer):
     def __init__(self, plugin_name, mutants):
         # Initialize basic configuration
+        super().__init__()
         self.plugin_name = plugin_name
         self.mutants = mutants
         self.xmt_targets = set()
