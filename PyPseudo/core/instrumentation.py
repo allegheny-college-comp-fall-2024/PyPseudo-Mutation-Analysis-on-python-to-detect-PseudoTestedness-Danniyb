@@ -194,6 +194,8 @@ class MutantInserter(ast.NodeTransformer):
         return node
     
 
+# instrumentation.py
+
 def instrument_code(source_code, plugin_name, mutants):
     """
     Main instrumentation function that processes source code and adds mutations.
@@ -223,7 +225,6 @@ def instrument_code(source_code, plugin_name, mutants):
         logger.error(f"Error during instrumentation: {str(e)}")
         raise
 
-
 def run_instrumentation(input_file, mutant_file):
     """
     Orchestrates the complete instrumentation process for a file.
@@ -242,6 +243,10 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
+        # Inject mutation support if needed
+        if Path(input_file).parent.name != '.pypseudo':
+            inject_mutation_support(input_file)
+        
         # Instrument the code - plugin_name passed as generic reference
         mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
 
@@ -253,6 +258,32 @@ def run_instrumentation(input_file, mutant_file):
             
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
+        raise
+
+def process_project(project_path, mutant_file):
+    """
+    Process an entire project for instrumentation
+    
+    Args:
+        project_path: Path to the project
+        mutant_file: Path to mutation configuration
+    """
+    try:
+        working_dir = setup_project_environment(project_path)
+        
+        # Copy support files
+        with open(mutant_file) as f:
+            mutants_config = json.load(f)
+        copy_support_files(working_dir, mutants_config)
+        
+        # Process Python files
+        for py_file in working_dir.glob("**/*.py"):
+            if '.pypseudo' not in str(py_file):
+                run_instrumentation(py_file, mutant_file)
+                
+        return working_dir
+    except Exception as e:
+        logger.error(f"Error processing project: {e}")
         raise
 
 
