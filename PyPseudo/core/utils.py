@@ -55,15 +55,20 @@ from mutation_support import is_mutant_enabled, MutationPlugin
     with open(target_file, 'w') as f:
         f.write(support_code + '\n' + content)
 
-def copy_support_files(working_dir):
+def copy_support_files(working_dir, mutants_config):
     """
     Copy necessary support files to project
     
     Args:
         working_dir: Path to working directory
+        mutants_config: Dictionary containing mutation configuration
     """
     support_dir = working_dir / '.pypseudo'
     support_dir.mkdir(exist_ok=True)
+    
+    # Write mutation configuration
+    with open(support_dir / 'mutants.json', 'w') as f:
+        json.dump(mutants_config, f, indent=2)
     
     # Copy core functionality
     core_files = {

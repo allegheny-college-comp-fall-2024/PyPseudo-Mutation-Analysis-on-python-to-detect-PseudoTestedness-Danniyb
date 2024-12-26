@@ -7,8 +7,16 @@ import json
 import ast
 from contextlib import contextmanager
 import signal
+from pathlib import Path
+import datetime  
+import sys
+
+# Add parent directory to Python path
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Import from core
 from core.mutation_plugin import MutationPlugin
-from core.instrumentation import run_instrumentation, restore_original
+from core.instrumentation import *
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

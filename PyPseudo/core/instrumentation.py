@@ -2,6 +2,7 @@ import ast
 import astor
 import json
 import logging
+import shutil
 import os
 from pathlib import Path
 from .utils import setup_project_environment, inject_mutation_support, copy_support_files
@@ -192,9 +193,7 @@ class MutantInserter(ast.NodeTransformer):
             return mutated_for
         
         return node
-    
 
-# instrumentation.py
 
 def instrument_code(source_code, plugin_name, mutants):
     """
