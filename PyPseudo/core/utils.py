@@ -42,12 +42,23 @@ def inject_mutation_support(target_file):
     Args:
         target_file: Path to file being instrumented
     """
+    # Update the import logic to use the local .pypseudo directory
     support_code = """
+# Auto-generated mutation support code
+import os
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent / '.pypseudo'))
 
+# Add .pypseudo directory to Python path
+_support_dir = Path(__file__).parent / '.pypseudo'
+if _support_dir.exists():
+    sys.path.insert(0, str(_support_dir))
+
+# Import mutation support
 from mutation_support import is_mutant_enabled, MutationPlugin
+
+# Initialize plugin with local config
+plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
 """
     
     with open(target_file, 'r') as f:
@@ -56,6 +67,8 @@ from mutation_support import is_mutant_enabled, MutationPlugin
     with open(target_file, 'w') as f:
         f.write(support_code + '\n' + content)
 
+
+        
 def copy_support_files(working_dir, mutants_config):
     """
     Copy necessary support files to project
