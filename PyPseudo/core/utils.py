@@ -34,7 +34,6 @@ def setup_project_environment(project_path):
             
     return working_dir
 
-
 def inject_mutation_support(target_file):
     """
     Inject necessary imports and support code into target file
@@ -68,7 +67,6 @@ plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
         f.write(support_code + '\n' + content)
 
 
-        
 def copy_support_files(working_dir, mutants_config):
     """
     Copy necessary support files to project
@@ -77,17 +75,17 @@ def copy_support_files(working_dir, mutants_config):
         working_dir: Path to working directory
         mutants_config: Dictionary containing mutation configuration
     """
+    # Create .pypseudo directory for support files
     support_dir = working_dir / '.pypseudo'
     support_dir.mkdir(exist_ok=True)
     
     # Write mutation configuration
     with open(support_dir / 'mutants.json', 'w') as f:
         json.dump(mutants_config, f, indent=2)
-    
-    # Copy core functionality
-    core_files = {
-        'mutation_support.py': '''
-from pathlib import Path
+        
+    # Copy mutation support module
+    with open(support_dir / 'mutation_support.py', 'w') as f:
+        f.write('''
 import json
 
 class MutationPlugin:
@@ -96,19 +94,26 @@ class MutationPlugin:
         self.load_config()
     
     def load_config(self):
-        with open(self.config_file) as f:
-            self.config = json.load(f)
-    
+        try:
+            with open(self.config_file) as f:
+                self.config = json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            self.config = {}
+            
     def is_mutant_enabled(self, mutant_id):
         return self.config.get('enable_mutation', False)
 
-plugin = MutationPlugin(Path(__file__).parent / 'mutants.json')
-
 def is_mutant_enabled(mutant_id):
-    return plugin.is_mutant_enabled(mutant_id)
-'''
-    }
+    """Global helper function for mutation checks"""
+    import sys
+    from pathlib import Path
     
-    for filename, content in core_files.items():
-        with open(support_dir / filename, 'w') as f:
-            f.write(content)
+    # Lazy load plugin only when needed
+    if 'plugin' not in globals():
+        global plugin
+        config_file = Path(__file__).parent / 'mutants.json'
+        plugin = MutationPlugin(str(config_file))
+        
+    return plugin.is_mutant_enabled(mutant_id)
+''')
