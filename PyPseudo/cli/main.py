@@ -455,13 +455,24 @@ def generate_mutation_report(results):
     print(f"Survived Mutations: {report['summary']['survived_mutations']}")
     print("\nDetailed results written to mutation_report.json")
 
-def run_tests(mutant_file, pytest_args):
-    """Run tests with the mutation plugin"""
+
+def run_tests(mutant_file, pytest_args, target_path=None):
+    """Run tests with the mutation plugin
+    
+    Args:
+        mutant_file: Path to mutation configuration file
+        pytest_args: Additional pytest arguments
+        target_path: Path to target project/directory to test (optional)
+    """
     plugin = MutationPlugin(mutant_file)
     plugin.load_mutants()
     
     try:
         with timeout(30):  # Add 30 second timeout
+            if target_path:
+                # Add target path to pytest args
+                pytest_args = [str(target_path)] + pytest_args
+            
             result = pytest.main(pytest_args, plugins=[plugin])
             return result
     except TimeoutException:
