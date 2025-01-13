@@ -48,14 +48,14 @@ class MutantInserter(ast.NodeTransformer):
         self._check_code_context(node)
         
         if not self.is_class_based:
-            # Add imports only for procedural code
+            # Add imports only for procedural code, using mutation_support instead
             imports = ast.parse(
-                'from mutation_plugin import MutationPlugin\n'
-                'plugin = MutationPlugin("mutants.json")\n'
+                'from mutation_support import MutationPlugin\n'
+                'plugin = MutationPlugin(str(Path(__file__).parent / ".pypseudo" / "mutants.json"))\n'
                 'plugin.load_mutants()'
             ).body
             node.body = imports + node.body
-            
+                
         return self.generic_visit(node)
     
                         
