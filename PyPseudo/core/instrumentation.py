@@ -48,12 +48,30 @@ class MutantInserter(ast.NodeTransformer):
         self._check_code_context(node)
         
         if not self.is_class_based:
-            # Add imports only for procedural code, using mutation_support instead
-            imports = ast.parse(
-                'from mutation_support import MutationPlugin\n'
-                'plugin = MutationPlugin(str(Path(__file__).parent / ".pypseudo" / "mutants.json"))\n'
-                'plugin.load_mutants()'
-            ).body
+            # Add imports and setup code for procedural modules
+            imports = ast.parse('''
+    # Auto-generated mutation support code
+    import os
+    import sys
+    from pathlib import Path
+
+    # Add local .pypseudo directory to path
+    _support_dir = Path(__file__).parent / '.pypseudo'
+    if _support_dir.exists():
+        sys.path.insert(0, str(_support_dir))
+
+    # Import from local support directory
+    from mutation_support import MutationPlugin, is_mutant_enabled
+
+    # Initialize plugin with local config
+    plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
+    plugin.load_mutants()  # Load mutation configuration
+
+    # Debug output to verify initialization
+    print(f"Loaded mutation config from {_support_dir / 'mutants.json'}")
+    ''').body
+            
+            # Add imports at the start of the module
             node.body = imports + node.body
                 
         return self.generic_visit(node)
