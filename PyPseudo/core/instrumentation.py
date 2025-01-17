@@ -49,8 +49,7 @@ class MutantInserter(ast.NodeTransformer):
         
         if not self.is_class_based:
             # Add imports and setup code for procedural modules
-            imports = ast.parse('''
-    # Auto-generated mutation support code
+            import_code = '''
     import os
     import sys
     from pathlib import Path
@@ -65,11 +64,11 @@ class MutantInserter(ast.NodeTransformer):
 
     # Initialize plugin with local config
     plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
-    plugin.load_mutants()  # Load mutation configuration
+    plugin.load_mutants()  # Load mutation configuration'''
 
-    # Debug output to verify initialization
-    print(f"Loaded mutation config from {_support_dir / 'mutants.json'}")
-    ''').body
+            # Parse the imports with dedent to remove any leading whitespace
+            from textwrap import dedent
+            imports = ast.parse(dedent(import_code).strip()).body
             
             # Add imports at the start of the module
             node.body = imports + node.body
