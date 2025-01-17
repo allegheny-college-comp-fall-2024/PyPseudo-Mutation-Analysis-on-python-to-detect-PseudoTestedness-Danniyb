@@ -457,24 +457,37 @@ def generate_mutation_report(results):
 
 
 def run_tests(mutant_file, pytest_args, target_path=None):
-    """Run tests with the mutation plugin
-    
-    Args:
-        mutant_file: Path to mutation configuration file
-        pytest_args: Additional pytest arguments
-        target_path: Path to target project/directory to test (optional)
-    """
-    plugin = MutationPlugin(mutant_file)
-    plugin.load_mutants()
-    
+    """Run tests with the mutation plugin"""
     try:
+        # Get the instrumented directory path
+        working_dir = None
+        if target_path:
+            original_path = Path(target_path)
+            # Check if path already contains _pypseudo_work
+            if "_pypseudo_work" in str(original_path):
+                working_dir = original_path
+            else:
+                working_dir = original_path.parent / f"{original_path.name}_pypseudo_work"
+                
+            if not working_dir.exists():
+                raise ValueError(f"No instrumented version found at {working_dir}. Run --instrument first.")
+
+        plugin = MutationPlugin(mutant_file)
+        plugin.load_mutants()
+        
         with timeout(30):  # Add 30 second timeout
-            if target_path:
-                # Add target path to pytest args
-                pytest_args = [str(target_path)] + pytest_args
+            if working_dir:
+                # Add working directory to Python path
+                sys.path.insert(0, str(working_dir))
+                
+                # Update pytest args to point to working directory
+                test_dir = working_dir
+                if test_dir not in pytest_args:
+                    pytest_args = [str(test_dir)] + pytest_args
             
             result = pytest.main(pytest_args, plugins=[plugin])
             return result
+            
     except TimeoutException:
         logger.error("Test execution timed out")
         return 1
@@ -553,30 +566,26 @@ def main():
     mode_group.add_argument('--run-all-mutations', action='store_true',
                           help='Run tests with each mutation one by one')
     
-    # project path argument
-    parser.add_argument('--project-path',
-                       help='Path to the project to analyze. If not provided, will use default target file.')
-    
-    # mutation type flags
+    # Project path and mutation flags
+    parser.add_argument('--project-path', required=True,
+                       help='Path to the project to analyze')
     parser.add_argument('--xmt', action='store_true',
                        help='Use extreme mutation testing only')
     parser.add_argument('--sdl', action='store_true',
                        help='Use statement deletion testing only')
-    
-    # mutation control flags
     parser.add_argument('--enable-mutations', action='store_true',
                        help='Enable mutations during test run')
     parser.add_argument('--disable-mutations', action='store_true',
                        help='Disable all mutations during test run')
     parser.add_argument('--single-mutant', 
-                       help='Run tests with only specified mutant enabled (e.g., "xmt_add" or "sdl_for")')
+                       help='Run tests with only specified mutant enabled (e.g., "xmt_add_1" or "sdl_for_1")')
     
     # Reporting arguments
-    parser.add_argument('--mutant-file', required=True, help='Path to the mutant file.')
-    parser.add_argument('--json-report', action='store_true', help='Generate a JSON report.')
-    parser.add_argument('--json-report-file', help='Path to save the JSON report.')
-    parser.add_argument('--cov', help='Module or directory to measure coverage for.')
-    parser.add_argument('--cov-report', help='Coverage report format (e.g., json, term, etc.).')
+    parser.add_argument('--mutant-file', required=True, help='Path to the mutant file')
+    parser.add_argument('--json-report', action='store_true', help='Generate a JSON report')
+    parser.add_argument('--json-report-file', help='Path to save the JSON report')
+    parser.add_argument('--cov', help='Module or directory to measure coverage for')
+    parser.add_argument('--cov-report', help='Coverage report format (e.g., json, term, etc.)')
 
     args = parser.parse_args()
 
@@ -591,97 +600,74 @@ def main():
     if args.cov_report:
         pytest_args.extend(['--cov-report', args.cov_report])
 
-    # Set target paths
-    target_file = args.project_path if args.project_path else 'simplePro/newtest.py'
-    is_project_mode = args.project_path is not None
-    
-    if is_project_mode:
-        working_dir = Path(target_file).parent / f"{Path(target_file).name}_pypseudo_work"
-    else:
-        backup_path = f"{target_file}.backup"
-        original_backup_path = f"{target_file}.original"
-    
-    original_mutants = None #Initialize here 
+    # Set up paths
+    project_path = Path(args.project_path)
+    working_dir = project_path.parent / f"{project_path.name}_pypseudo_work"
+    original_mutants = None
 
     try:
-        if args.list_mutations:
-            target = working_dir if is_project_mode else target_file
-            list_available_mutations(args, target)
-            return
-
-        if args.run_all_mutations:
-            target = working_dir if is_project_mode else target_file
-            results = run_all_mutations(args, pytest_args, target)
-            generate_mutation_report(results)
-            return
-        
         if args.restore:
-            if is_project_mode:
-                logger.info(f"Restoring project {target_file}")
-                restore_project(target_file)
-            else:
-                logger.info(f"Restoring {target_file} to original state")
-                restore_original(target_file, original_backup_path)
+            logger.info(f"Restoring project {project_path}")
+            restore_project(project_path)
             return
 
-        # Load and filter mutations based on flags
+        if args.list_mutations:
+            if working_dir.exists():
+                list_available_mutations(args, working_dir)
+            else:
+                logger.error("No instrumented version found. Run --instrument first.")
+            return
+
+        # Load and filter mutations
         with open(args.mutant_file, 'r') as f:
             mutants_data = json.load(f)
             original_mutants = json.loads(json.dumps(mutants_data))  # Deep copy
-        
+
         filtered_mutants = filter_mutations(mutants_data, args)
         
-        # Write filtered mutations back to file
+        # Write filtered mutations
         with open(args.mutant_file, 'w') as f:
             json.dump(filtered_mutants, f, indent=4)
 
         if args.instrument:
             logger.info("Running instrumentation...")
-            if is_project_mode:
-                process_project(target_file, args.mutant_file)
-            else:
-                # Create original backup if it doesn't exist
-                if not os.path.exists(original_backup_path):
-                    logger.info(f"Creating original backup of {target_file}")
-                    shutil.copy2(target_file, original_backup_path)
-
-                # Create working backup
-                logger.info(f"Creating working backup of {target_file}")
-                shutil.copy2(target_file, backup_path)
-                
-                run_instrumentation(target_file, args.mutant_file)
-            
+            working_dir = process_project(project_path, args.mutant_file)
             logger.info("Instrumentation complete")
             return
 
         if args.run:
+            if not working_dir.exists():
+                logger.error("No instrumented version found. Run --instrument first.")
+                return
+                
             logger.info("Running tests...")
-            target = working_dir if is_project_mode else target_file
-            result = run_tests(args.mutant_file, pytest_args, target)
+            result = run_tests(args.mutant_file, pytest_args, working_dir)
 
             if result == 0:
                 logger.info("All tests passed")
             else:
                 logger.warning("Some tests failed")
+            return
 
-            # Restore from backup for file mode
-            if not is_project_mode:
-                logger.info("Restoring from working backup...")
-                if os.path.exists(backup_path):
-                    shutil.copy2(backup_path, target_file)
-                    os.remove(backup_path)
+        if args.run_all_mutations:
+            if not working_dir.exists():
+                logger.error("No instrumented version found. Run --instrument first.")
+                return
+                
+            results = run_all_mutations(args, pytest_args, working_dir)
+            generate_mutation_report(results)
+            return
 
     except Exception as e:
         logger.error(f"Error during execution: {str(e)}")
-        if not is_project_mode and os.path.exists(original_backup_path):
-            logger.info("Attempting to restore from original backup after error...")
-            shutil.copy2(original_backup_path, target_file)
-            if os.path.exists(backup_path):
-                os.remove(backup_path)
+        # Clean up working directory on error if it exists
+        if working_dir.exists():
+            logger.info("Cleaning up working directory after error...")
+            shutil.rmtree(working_dir)
         raise
 
     finally:
-        # Only restore mutants file if we have original_mutants
+        # Restore original mutants configuration
         if original_mutants is not None:
             with open(args.mutant_file, 'w') as f:
                 json.dump(original_mutants, f, indent=4)

@@ -35,26 +35,40 @@ def setup_project_environment(project_path):
     return working_dir
 
 def inject_mutation_support(target_file):
-    """Inject necessary imports and support code"""
+    """
+    Inject necessary imports and support code into target file
+    
+    Args:
+        target_file: Path to file being instrumented
+    """
+    is_test_file = Path(target_file).name.startswith('test_') or 'test' in Path(target_file).name
+    
     support_code = """
 # Auto-generated mutation support code
 import os
 import sys
 from pathlib import Path
 
-# Get absolute path to .pypseudo directory
-_support_dir = Path(__file__).resolve().parent / '.pypseudo'
+# Add parent directory to Python path for imports
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+
+# Add .pypseudo directory to path
+_support_dir = current_dir / '.pypseudo'
 if _support_dir.exists():
     sys.path.insert(0, str(_support_dir))
 
-# Import mutation support
-from mutation_support import is_mutant_enabled, MutationPlugin
+# Import support modules
+""" + ("""
+from mutation_support import MutationPlugin, is_mutant_enabled
+""" if is_test_file else """
+from mutation_support import MutationPlugin, is_mutant_enabled
 plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
-"""
+""")
     
     with open(target_file, 'r') as f:
         content = f.read()
-    
+        
     with open(target_file, 'w') as f:
         f.write(support_code + '\n' + content)
         

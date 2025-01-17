@@ -259,18 +259,31 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
+        # For test files, replace mutation_plugin import with mutation_support
+        is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
+        if is_test_file:
+            source_code = source_code.replace(
+                'from mutation_plugin import MutationPlugin',
+                'from mutation_support import MutationPlugin'
+            )
+        
+        # Write back modified source if it's a test file
+        if is_test_file:
+            with open(input_file, 'w') as f:
+                f.write(source_code)
+            
         # Inject mutation support if needed
         if Path(input_file).parent.name != '.pypseudo':
             inject_mutation_support(input_file)
         
         # Instrument the code - plugin_name passed as generic reference
-        mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
-
-        # Write instrumented code back
-        with open(input_file, 'w') as f:
-            f.write(mutated_code)
+        if not is_test_file:  # Only instrument non-test files
+            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
+            # Write instrumented code back
+            with open(input_file, 'w') as f:
+                f.write(mutated_code)
             
-        logger.info(f"Successfully instrumented {input_file}")
+        logger.info(f"Successfully {'modified' if is_test_file else 'instrumented'} {input_file}")
             
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
