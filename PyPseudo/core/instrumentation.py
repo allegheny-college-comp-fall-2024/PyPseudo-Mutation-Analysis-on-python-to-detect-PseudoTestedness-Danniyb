@@ -292,10 +292,22 @@ def process_project(project_path, mutant_file):
             mutants_config = json.load(f)
         copy_support_files(working_dir, mutants_config)
         
-        # Process Python files
+        # Process Python files, skip test files
         for py_file in working_dir.glob("**/*.py"):
-            if '.pypseudo' not in str(py_file):
-                run_instrumentation(py_file, mutant_file)
+            # Skip files in .pypseudo directory
+            if '.pypseudo' in str(py_file):
+                continue
+                
+            # Skip test files (using common test file patterns)
+            file_name = py_file.name.lower()
+            if (file_name.startswith('test_') or 
+                file_name.endswith('_test.py') or 
+                'test' in file_name):
+                logger.info(f"Skipping test file: {py_file}")
+                continue
+            
+            # Process non-test files
+            run_instrumentation(py_file, mutant_file)
                 
         return working_dir
     except Exception as e:
