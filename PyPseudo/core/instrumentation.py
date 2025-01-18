@@ -244,6 +244,10 @@ def instrument_code(source_code, plugin_name, mutants):
 def run_instrumentation(input_file, mutant_file):
     """
     Orchestrates the complete instrumentation process for a file.
+    
+    Args:
+        input_file: Path to the Python file to instrument
+        mutant_file: Path to the mutation configuration file
     """
     try:
         # Load mutation configurations
@@ -307,6 +311,8 @@ from calculator import Calculator
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
         raise
+
+
 def process_project(project_path, mutant_file):
     """
     Process an entire project for instrumentation
@@ -317,6 +323,11 @@ def process_project(project_path, mutant_file):
     """
     try:
         working_dir = setup_project_environment(project_path)
+
+        # Create __init__.py in working directory
+        init_file = working_dir / '__init__.py'
+        if not init_file.exists():
+            init_file.touch()
         
         # Copy support files
         with open(mutant_file) as f:
