@@ -244,10 +244,6 @@ def instrument_code(source_code, plugin_name, mutants):
 def run_instrumentation(input_file, mutant_file):
     """
     Orchestrates the complete instrumentation process for a file.
-    
-    Args:
-        input_file: Path to the Python file to instrument
-        mutant_file: Path to the mutation configuration file
     """
     try:
         # Load mutation configurations
@@ -259,36 +255,58 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # For test files, replace mutation_plugin import with mutation_support
+        # Handle test files differently
         is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
         if is_test_file:
+            # Modify imports for test file
+            modified_code = """# Auto-generated mutation support code
+import os
+import sys
+from pathlib import Path
+
+# Add parent directory and .pypseudo to Python path
+current_dir = Path(__file__).parent
+_support_dir = current_dir / '.pypseudo'
+if _support_dir.exists():
+    sys.path.insert(0, str(_support_dir))
+    sys.path.insert(0, str(current_dir))
+
+from mutation_support import MutationPlugin
+from calculator import Calculator
+
+"""
+            # Replace old imports with new ones
             source_code = source_code.replace(
-                'from mutation_plugin import MutationPlugin',
-                'from mutation_support import MutationPlugin'
+                'from mutation_plugin import MutationPlugin\n',
+                ''
+            ).replace(
+                'from calculator import Calculator\n',
+                ''
             )
-        
-        # Write back modified source if it's a test file
-        if is_test_file:
+            
+            # Add modified imports at the start
+            source_code = modified_code + source_code
+
+            # Update test fixture to use correct mutant file path
+            source_code = source_code.replace(
+                'mutant_file="mutants.json"',
+                'mutant_file=str(Path(__file__).parent / ".pypseudo" / "mutants.json")'
+            )
+
+            # Write modified test file
             with open(input_file, 'w') as f:
                 f.write(source_code)
-            
-        # Inject mutation support if needed
-        if Path(input_file).parent.name != '.pypseudo':
-            inject_mutation_support(input_file)
-        
-        # Instrument the code - plugin_name passed as generic reference
-        if not is_test_file:  # Only instrument non-test files
+            logger.info(f"Modified test file: {input_file}")
+        else:
+            # Handle non-test files
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
-            # Write instrumented code back
             with open(input_file, 'w') as f:
                 f.write(mutated_code)
-            
-        logger.info(f"Successfully {'modified' if is_test_file else 'instrumented'} {input_file}")
+            logger.info(f"Instrumented file: {input_file}")
             
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
         raise
-
 def process_project(project_path, mutant_file):
     """
     Process an entire project for instrumentation
