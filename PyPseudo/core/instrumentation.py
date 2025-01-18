@@ -259,54 +259,46 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Handle test files differently
+        # For test files, modify imports and add mutation support
         is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
         if is_test_file:
-            # Modify imports for test file
-            modified_code = """# Auto-generated mutation support code
-import os
+            # Add support code at start of file
+            support_code = """import os
 import sys
 from pathlib import Path
 
 # Add parent directory and .pypseudo to Python path
 current_dir = Path(__file__).parent
-_support_dir = current_dir / '.pypseudo'
-if _support_dir.exists():
-    sys.path.insert(0, str(_support_dir))
-    sys.path.insert(0, str(current_dir))
+sys.path.insert(0, str(current_dir))
 
 from mutation_support import MutationPlugin
-from calculator import Calculator
-
 """
-            # Replace old imports with new ones
+            # Replace original imports
             source_code = source_code.replace(
                 'from mutation_plugin import MutationPlugin\n',
                 ''
-            ).replace(
-                'from calculator import Calculator\n',
-                ''
             )
             
-            # Add modified imports at the start
-            source_code = modified_code + source_code
-
-            # Update test fixture to use correct mutant file path
+            # Update mutant file path in fixture
             source_code = source_code.replace(
                 'mutant_file="mutants.json"',
                 'mutant_file=str(Path(__file__).parent / ".pypseudo" / "mutants.json")'
             )
-
+            
+            # Combine support code with modified source
+            source_code = support_code + '\n' + source_code
+            
             # Write modified test file
             with open(input_file, 'w') as f:
                 f.write(source_code)
-            logger.info(f"Modified test file: {input_file}")
+                
         else:
-            # Handle non-test files
+            # Regular instrumentation for non-test files
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
             with open(input_file, 'w') as f:
                 f.write(mutated_code)
-            logger.info(f"Instrumented file: {input_file}")
+            
+        logger.info(f"Successfully {'modified' if is_test_file else 'instrumented'} {input_file}")
             
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
@@ -323,33 +315,38 @@ def process_project(project_path, mutant_file):
     """
     try:
         working_dir = setup_project_environment(project_path)
+        
+        # Create __init__.py with proper imports
+        init_content = """# Auto-generated initialization code
+import os
+import sys
+from pathlib import Path
 
+# Add .pypseudo directory to path
+_support_dir = Path(__file__).parent / '.pypseudo'
+if _support_dir.exists():
+    sys.path.insert(0, str(_support_dir))
+
+# Import mutation support and initialize plugin
+from mutation_support import MutationPlugin, is_mutant_enabled
+plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
+plugin.load_mutants()
+"""
+        
         # Create __init__.py in working directory
         init_file = working_dir / '__init__.py'
-        if not init_file.exists():
-            init_file.touch()
+        with open(init_file, 'w') as f:
+            f.write(init_content)
         
         # Copy support files
         with open(mutant_file) as f:
             mutants_config = json.load(f)
         copy_support_files(working_dir, mutants_config)
         
-        # Process Python files, skip test files
+        # Process Python files
         for py_file in working_dir.glob("**/*.py"):
-            # Skip files in .pypseudo directory
-            if '.pypseudo' in str(py_file):
-                continue
-                
-            # Skip test files (using common test file patterns)
-            file_name = py_file.name.lower()
-            if (file_name.startswith('test_') or 
-                file_name.endswith('_test.py') or 
-                'test' in file_name):
-                logger.info(f"Skipping test file: {py_file}")
-                continue
-            
-            # Process non-test files
-            run_instrumentation(py_file, mutant_file)
+            if '.pypseudo' not in str(py_file) and py_file.name != '__init__.py':
+                run_instrumentation(py_file, mutant_file)
                 
         return working_dir
     except Exception as e:
