@@ -4,6 +4,7 @@ import json
 import logging
 import shutil
 import os
+import re
 from pathlib import Path
 from .utils import setup_project_environment, inject_mutation_support, copy_support_files
 
@@ -251,7 +252,7 @@ def run_instrumentation(input_file, mutant_file):
     """
     try:
         # Load mutation configurations
-        with open(mutant_file, 'r') as f:
+        with open(mutant_file) as f:
             mutants_data = json.load(f)
             enabled_mutants = mutants_data.get('enabled_mutants', [])
 
@@ -259,47 +260,42 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # For test files, modify imports and add mutation support
+        # Special handling for test files
         is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
         if is_test_file:
-            # Add support code at start of file
-            support_code = """import os
+            support_code = """
 import sys
 from pathlib import Path
 
-# Add parent directory and .pypseudo to Python path
-current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir))
+support_dir = Path(__file__).parent / '.pypseudo'
+if support_dir.exists():
+    sys.path.insert(0, str(support_dir))
 
 from mutation_support import MutationPlugin
+
+@pytest.fixture
+def plugin():
+    plugin = MutationPlugin(str(Path(__file__).parent / '.pypseudo' / 'mutants.json'))
+    plugin.load_mutants()
+    return plugin
 """
-            # Replace original imports
-            source_code = source_code.replace(
-                'from mutation_plugin import MutationPlugin\n',
-                ''
+            # Replace existing plugin fixture if present
+            source_code = re.sub(
+                r'@pytest\.fixture\s*\ndef\s+plugin\s*\(\s*\)[\s\S]*?return\s+plugin\s*\n',
+                '',
+                source_code
             )
-            
-            # Update mutant file path in fixture
-            source_code = source_code.replace(
-                'mutant_file="mutants.json"',
-                'mutant_file=str(Path(__file__).parent / ".pypseudo" / "mutants.json")'
-            )
-            
-            # Combine support code with modified source
             source_code = support_code + '\n' + source_code
-            
-            # Write modified test file
-            with open(input_file, 'w') as f:
-                f.write(source_code)
-                
+
         else:
-            # Regular instrumentation for non-test files
+            # Regular file instrumentation
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
-            with open(input_file, 'w') as f:
-                f.write(mutated_code)
-            
-        logger.info(f"Successfully {'modified' if is_test_file else 'instrumented'} {input_file}")
-            
+            source_code = mutated_code
+
+        # Write modified code
+        with open(input_file, 'w') as f:
+            f.write(source_code)
+
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
         raise
