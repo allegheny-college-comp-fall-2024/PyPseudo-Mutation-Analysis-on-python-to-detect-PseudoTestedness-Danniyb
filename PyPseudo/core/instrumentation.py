@@ -251,22 +251,36 @@ def run_instrumentation(input_file, mutant_file):
         mutant_file: Path to the mutation configuration file
     """
     try:
-        # Load mutation configurations
         with open(mutant_file) as f:
             mutants_data = json.load(f)
             enabled_mutants = mutants_data.get('enabled_mutants', [])
 
-        # Read source code
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Special handling for test files
         is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
         if is_test_file:
-            support_code = """
-import sys
-from pathlib import Path
+            # Remove old imports and fixtures
+            source_code = re.sub(
+                r'from mutation_plugin import MutationPlugin.*?\n',
+                '',
+                source_code
+            )
+            source_code = re.sub(
+                r'@pytest\.fixture\s*\ndef plugin\(\).*?return plugin\s*\n',
+                '',
+                source_code,
+                flags=re.DOTALL
+            )
 
+            # Add the new imports and fixture
+            support_code = """import os
+import sys
+import pytest
+from pathlib import Path
+from calculator import Calculator
+
+# Add path to mutation support
 support_dir = Path(__file__).parent / '.pypseudo'
 if support_dir.exists():
     sys.path.insert(0, str(support_dir))
@@ -279,20 +293,12 @@ def plugin():
     plugin.load_mutants()
     return plugin
 """
-            # Replace existing plugin fixture if present
-            source_code = re.sub(
-                r'@pytest\.fixture\s*\ndef\s+plugin\s*\(\s*\)[\s\S]*?return\s+plugin\s*\n',
-                '',
-                source_code
-            )
             source_code = support_code + '\n' + source_code
 
         else:
-            # Regular file instrumentation
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
             source_code = mutated_code
 
-        # Write modified code
         with open(input_file, 'w') as f:
             f.write(source_code)
 
