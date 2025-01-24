@@ -35,14 +35,23 @@ class MutationPlugin:
 
     def _process_mutants(self, mutants):
         """Process mutant configurations"""
+        print("\n=== Debug: Processing Mutants ===")
+        print(f"Input mutants: {json.dumps(mutants, indent=2)}")
+        
         for mutant in mutants:
             if mutant['type'] == 'xmt':
                 if mutant['target'] == '*':
                     self.xmt_targets.add('*')
                 else:
                     self.xmt_targets.add(mutant['target'])
+                print(f"Added XMT target: {mutant['target']}")
             elif mutant['type'] == 'sdl':
                 self.sdl_targets.update(mutant['target'])
+                print(f"Added SDL targets: {mutant['target']}")
+        
+        print(f"Final targets:")
+        print(f"  - XMT: {self.xmt_targets}")
+        print(f"  - SDL: {self.sdl_targets}")
 
     def load_mutants(self):
         """Load mutant data from file"""
@@ -63,24 +72,45 @@ class MutationPlugin:
 
     def is_mutant_enabled(self, mutant_id):
         """Check if mutation is enabled for given ID"""
+        print(f"\n=== Debug: Mutation Check for {mutant_id} ===")
+        print(f"Mutation enabled flag: {self.mutation_enabled}")
+        print(f"Current enabled_mutants: {json.dumps(self.enabled_mutants, indent=2)}")
+            
         if not self.mutation_enabled:
+            print("Result: Mutations globally disabled")
             return False
+
+        # Parse mutation ID
+        parts = mutant_id.split('_')
+        if len(parts) < 2:
+            print("Result: Invalid mutation ID format")
+            return False
+                
+        mut_type = parts[0]  # xmt or sdl
+        target = parts[1]    # Function/statement name
+        number = parts[2] if len(parts) > 2 else None  # Mutation number
             
-        # Handle XMT mutations with numbers
-        if mutant_id.startswith('xmt_'):
-            # Extract function name and number if present
-            parts = mutant_id.replace('xmt_', '').split('_')
-            func_name = parts[0]
-            if len(parts) > 1:  # Has number
-                return f"{func_name}_{parts[1]}" in self.xmt_targets or '*' in self.xmt_targets
-            return func_name in self.xmt_targets or '*' in self.xmt_targets
-            
-        # Handle SDL mutations with numbers
-        if mutant_id.startswith('sdl_'):
-            parts = mutant_id.replace('sdl_', '').split('_')
-            stmt_type = parts[0]
-            if len(parts) > 1:  # Has number
-                return f"{stmt_type}_{parts[1]}" in self.sdl_targets
-            return stmt_type in self.sdl_targets
-            
+        print(f"Parsed mutation:")
+        print(f"  - Type: {mut_type}")
+        print(f"  - Target: {target}")
+        print(f"  - Number: {number}")
+        print(f"Current targets:")
+        print(f"  - XMT: {self.xmt_targets}")
+        print(f"  - SDL: {self.sdl_targets}")
+
+        # For XMT mutations
+        if mut_type == 'xmt':
+            exact_id = '_'.join([target, number]) if number else target
+            result = exact_id in self.xmt_targets
+            print(f"XMT check: {exact_id} in {self.xmt_targets} = {result}")
+            return result
+
+        # For SDL mutations    
+        if mut_type == 'sdl':
+            stmt_type = target
+            result = stmt_type in self.sdl_targets
+            print(f"SDL check: {stmt_type} in {self.sdl_targets} = {result}")
+            return result
+
+        print("Result: No matching mutation type")
         return False

@@ -515,6 +515,10 @@ class TimeoutException(Exception):
 
 def filter_mutations(mutants_data, args):
     """Filter mutations based on command line arguments"""
+    print("\n=== Debug: Filter Mutations Start ===")
+    print(f"Initial mutants_data: {json.dumps(mutants_data, indent=2)}")
+    print(f"Args: disable={args.disable_mutations}, single={args.single_mutant}, xmt={args.xmt}, sdl={args.sdl}")
+
     # Handle mutation enabling/disabling
     if args.disable_mutations:
         mutants_data['enable_mutation'] = False
@@ -523,31 +527,24 @@ def filter_mutations(mutants_data, args):
     
     # Handle single mutant case
     if args.single_mutant:
+        # Parse mutation ID
         parts = args.single_mutant.split('_')
-        mut_type = parts[0]
-        target = '_'.join(parts[1:])  # Join remaining parts for numbered mutations
+        mut_type = parts[0]  # xmt or sdl
+        mut_id = '_'.join(parts[1:])
         
-        if mut_type == 'xmt':
-            mutants_data['enabled_mutants'] = [{'type': 'xmt', 'target': target}]
-        else:
-            mutants_data['enabled_mutants'] = [{'type': 'sdl', 'target': [target]}]
+        # Set up single mutant configuration
+        mutants_data['enabled_mutants'] = [{
+            'type': mut_type,
+            'target': '_'.join(parts[1:]) if mut_type == 'xmt' else parts[1]
+        }]
+        print(f"DEBUG: Single mutant configuration:")
+        print(f"  - Type: {mut_type}")
+        print(f"  - Target: {mut_id}")
+        print(f"  - Final config: {json.dumps(mutants_data, indent=2)}")
         return mutants_data
-    
-    filtered_mutants = []
-    if args.sdl:
-        filtered_mutants.append({'type': 'sdl', 'target': ['if']})
-        filtered_mutants.append({'type': 'sdl', 'target': ['for']})
-    if args.xmt:
-        filtered_mutants.append({'type': 'xmt', 'target': '*'})
-    
-    if not filtered_mutants:
-        filtered_mutants = [
-            {'type': 'xmt', 'target': '*'},
-            {'type': 'sdl', 'target': ['for']},
-            {'type': 'sdl', 'target': ['if']}
-        ]
-    
-    mutants_data['enabled_mutants'] = filtered_mutants
+
+    # Rest of your existing code...
+    print(f"=== Debug: Final mutants_data: {json.dumps(mutants_data, indent=2)}")
     return mutants_data
 
 def main():
