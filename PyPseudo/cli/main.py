@@ -456,6 +456,28 @@ def generate_mutation_report(results):
     print("\nDetailed results written to mutation_report.json")
 
 
+
+class TimeoutException(Exception):
+    """Exception raised when a timeout occurs"""
+    pass
+
+@contextmanager
+def timeout(seconds):
+    """Context manager for timing out operations"""
+    def handler(signum, frame):
+        raise TimeoutException()
+    
+    # Set the timeout handler
+    previous_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def run_tests(mutant_file, pytest_args, target_path=None):
     """Run tests with the mutation plugin"""
     try:
@@ -472,7 +494,16 @@ def run_tests(mutant_file, pytest_args, target_path=None):
             if not working_dir.exists():
                 raise ValueError(f"No instrumented version found at {working_dir}. Run --instrument first.")
 
-        plugin = MutationPlugin(mutant_file)
+        # Update mutation config in work directory
+        work_mutants_file = working_dir / '.pypseudo' / 'mutants.json'
+        with open(mutant_file, 'r') as f:
+            current_config = json.load(f)
+            
+        # Write updated config to work directory
+        with open(work_mutants_file, 'w') as f:
+            json.dump(current_config, f, indent=2)
+
+        plugin = MutationPlugin(str(work_mutants_file))
         plugin.load_mutants()
         
         with timeout(30):  # Add 30 second timeout
@@ -495,57 +526,109 @@ def run_tests(mutant_file, pytest_args, target_path=None):
         logger.error(f"Error during test execution: {str(e)}")
         return 1
 
-@contextmanager
-def timeout(seconds):
-    def handler(signum, frame):
-        raise TimeoutException()
-    
-    # Set the timeout handler
-    previous_handler = signal.signal(signal.SIGALRM, handler)
-    signal.alarm(seconds)
-    
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous_handler)
-
-class TimeoutException(Exception):
-    pass
-
 def filter_mutations(mutants_data, args):
     """Filter mutations based on command line arguments"""
     print("\n=== Debug: Filter Mutations Start ===")
     print(f"Initial mutants_data: {json.dumps(mutants_data, indent=2)}")
-    print(f"Args: disable={args.disable_mutations}, single={args.single_mutant}, xmt={args.xmt}, sdl={args.sdl}")
 
-    # Handle mutation enabling/disabling
-    if args.disable_mutations:
-        mutants_data['enable_mutation'] = False
-    else:
-        mutants_data['enable_mutation'] = True
-    
-    # Handle single mutant case
-    if args.single_mutant:
-        # Parse mutation ID
-        parts = args.single_mutant.split('_')
-        mut_type = parts[0]  # xmt or sdl
-        mut_id = '_'.join(parts[1:])
+    # For instrumentation phase
+    if args.instrument:
+        filtered_mutants = {
+            "enable_mutation": True,
+            "enabled_mutants": []
+        }
         
-        # Set up single mutant configuration
-        mutants_data['enabled_mutants'] = [{
-            'type': mut_type,
-            'target': '_'.join(parts[1:]) if mut_type == 'xmt' else parts[1]
-        }]
-        print(f"DEBUG: Single mutant configuration:")
-        print(f"  - Type: {mut_type}")
-        print(f"  - Target: {mut_id}")
-        print(f"  - Final config: {json.dumps(mutants_data, indent=2)}")
-        return mutants_data
+        # Add XMT mutations if flag is set
+        if args.xmt:
+            filtered_mutants["enabled_mutants"].append({
+                "type": "xmt",
+                "target": "*"
+            })
+            
+        # Add SDL mutations if flag is set
+        if args.sdl:
+            filtered_mutants["enabled_mutants"].append({
+                "type": "sdl",
+                "target": ["for", "if", "while", "return", "try"]
+            })
+            
+        return filtered_mutants
+        
+    # For test running phase
+    filtered_mutants = {
+        "enable_mutation": False,  # Default to disabled
+        "enabled_mutants": []
+    }
 
-    # Rest of your existing code...
-    print(f"=== Debug: Final mutants_data: {json.dumps(mutants_data, indent=2)}")
-    return mutants_data
+    # Handle disable mutations flag
+    if args.disable_mutations:
+        return filtered_mutants
+
+    # Handle enable mutations
+    if args.enable_mutations or args.xmt or args.sdl:
+        filtered_mutants["enable_mutation"] = True
+
+        # Handle single mutant case
+        if args.single_mutant:
+            parts = args.single_mutant.split('_')
+            mut_type = parts[0]
+            
+            if mut_type == "xmt":
+                filtered_mutants["enabled_mutants"].append({
+                    "type": "xmt",
+                    "target": args.single_mutant  # Keep full mutation ID
+                })
+            elif mut_type == "sdl":
+                filtered_mutants["enabled_mutants"].append({
+                    "type": "sdl",
+                    "target": [parts[1]]
+                })
+            return filtered_mutants
+
+        # Handle XMT/SDL flags
+        if args.xmt:
+            filtered_mutants["enabled_mutants"].append({
+                "type": "xmt",
+                "target": "*"
+            })
+            
+        if args.sdl:
+            filtered_mutants["enabled_mutants"].append({
+                "type": "sdl",
+                "target": ["for", "if", "while", "return", "try"]
+            })
+            
+    return filtered_mutants
+#    if args.single_mutant:
+#        parts = args.single_mutant.split('_')
+#        mut_type = parts[0]  # xmt or sdl
+#        mutation_id = '_'.join(parts[1:])  # complete mutation id (e.g. add_1)
+       
+#        mutants_data['enabled_mutants'] = [{
+#            'type': mut_type,
+#            'target': mutation_id  # Keep full mutation id 
+#        }]
+#        print(f"DEBUG: Single mutant configuration:")
+#        print(f"  - Type: {mut_type}")
+#        print(f"  - Target: {mutation_id}")
+#        return mutants_data
+
+#    filtered_mutants = []
+#    if args.sdl:
+#        filtered_mutants.append({
+#            'type': 'sdl',
+#            'target': ['if', 'for', 'while', 'return', 'try']
+#        })
+#    if args.xmt:
+#        filtered_mutants.append({
+#            'type': 'xmt',
+#            'target': '*'
+#        })
+   
+#    if filtered_mutants:
+#        mutants_data['enabled_mutants'] = filtered_mutants
+   
+#    return mutants_data
 
 def main():
     parser = argparse.ArgumentParser(description='Run mutation testing with pytest.')

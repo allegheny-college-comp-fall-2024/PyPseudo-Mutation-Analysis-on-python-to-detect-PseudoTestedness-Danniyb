@@ -34,6 +34,39 @@ class MutantInserter(ast.NodeTransformer):
                 self.is_class_based = True
                 break
 
+    def _analyze_return_value(self, node):
+        """Analyze function returns to determine appropriate mutation value"""
+        return_stmts = []
+        for n in ast.walk(node):
+            if isinstance(n, ast.Return) and n.value:
+                return_stmts.append(n.value)
+
+        # If no return statements found, return None
+        if not return_stmts:
+            return ast.Constant(value=None)
+
+        # Analyze first return statement's type
+        first_return = return_stmts[0]
+        
+        if isinstance(first_return, ast.BinOp):
+            # For arithmetic operations, return 0
+            return ast.Num(n=0)
+        elif isinstance(first_return, ast.List):
+            # For list operations, return empty list
+            return ast.List(elts=[], ctx=ast.Load())
+        elif isinstance(first_return, ast.Dict):
+            # For dict operations, return empty dict
+            return ast.Dict(keys=[], values=[])
+        elif isinstance(first_return, ast.Call):
+            # For function calls, try to determine return type
+            return ast.Num(n=0)  # Default to 0 for numeric operations
+        elif isinstance(first_return, ast.Name):
+            # For variable returns, default to None
+            return ast.Constant(value=None)
+        else:
+            # Default case
+            return ast.Constant(value=None)
+
     def _create_mutation_check(self, mutation_id, message):
         """Create appropriate mutation check based on context"""
         plugin_ref = "self.plugin" if self.is_class_based else "plugin"
@@ -78,6 +111,7 @@ class MutantInserter(ast.NodeTransformer):
     
                         
     def process_mutants(self):
+        """Process mutation configuration"""
         for mutant in self.mutants:
             if mutant['type'] == 'xmt':
                 if mutant['target'] == '*':
@@ -103,26 +137,43 @@ class MutantInserter(ast.NodeTransformer):
 
 
     def visit_FunctionDef(self, node):
-        """
-        Handle XMT mutations at the function level while preserving existing mutations.
-        """
-        # Check if this function already has an XMT mutation
+        """Handle XMT mutations at the function level"""
         has_xmt = node.body and isinstance(node.body[0], ast.If) and self.is_xmt_mutation(node.body[0])
         
-        # Visit children first to handle nested statements
         self.generic_visit(node)
         
-        # Skip special methods
         if node.name.startswith('__') and node.name.endswith('__'):
             return node
             
-        # Only add XMT mutation if function is targeted and doesn't already have one
         if not has_xmt and ('*' in self.xmt_targets or node.name in self.xmt_targets):
             mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
             self.counters['xmt'] += 1
 
-            message = f'XMT: Removing body of function {node.name}'
-            mutation_check = self._create_mutation_check(mutation_id, message)
+            # Analyze function to determine appropriate return value
+            return_value = self._analyze_return_value(node)
+
+            # Create mutation check
+            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
+            mutation_check = ast.If(
+                test=ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(id=plugin_ref, ctx=ast.Load()),
+                        attr='is_mutant_enabled',
+                        ctx=ast.Load()
+                    ),
+                    args=[ast.Str(s=mutation_id)],
+                    keywords=[]
+                ),
+                body=[
+                    ast.Expr(value=ast.Call(
+                        func=ast.Name(id='print', ctx=ast.Load()),
+                        args=[ast.Constant(s=f'XMT: Removing body of function {node.name}')],
+                        keywords=[]
+                    )),
+                    ast.Return(value=return_value)
+                ],
+                orelse=[]
+            )
             
             node.body.insert(0, mutation_check)
             logger.info(f"Added XMT mutation {mutation_id} to function {node.name}")

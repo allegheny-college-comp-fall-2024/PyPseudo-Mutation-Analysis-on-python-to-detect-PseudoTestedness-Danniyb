@@ -72,45 +72,39 @@ class MutationPlugin:
 
     def is_mutant_enabled(self, mutant_id):
         """Check if mutation is enabled for given ID"""
-        print(f"\n=== Debug: Mutation Check for {mutant_id} ===")
-        print(f"Mutation enabled flag: {self.mutation_enabled}")
-        print(f"Current enabled_mutants: {json.dumps(self.enabled_mutants, indent=2)}")
-            
-        if not self.mutation_enabled:
-            print("Result: Mutations globally disabled")
+        if not self.config.get('enable_mutation', False):
+            print(f"\nMutation check [{mutant_id}]: disabled globally")
             return False
 
-        # Parse mutation ID
         parts = mutant_id.split('_')
         if len(parts) < 2:
-            print("Result: Invalid mutation ID format")
+            print(f"\nMutation check [{mutant_id}]: invalid format")
             return False
                 
-        mut_type = parts[0]  # xmt or sdl
-        target = parts[1]    # Function/statement name
-        number = parts[2] if len(parts) > 2 else None  # Mutation number
-            
-        print(f"Parsed mutation:")
-        print(f"  - Type: {mut_type}")
-        print(f"  - Target: {target}")
-        print(f"  - Number: {number}")
-        print(f"Current targets:")
-        print(f"  - XMT: {self.xmt_targets}")
-        print(f"  - SDL: {self.sdl_targets}")
+        mut_type = parts[0]      # xmt or sdl
+        target_name = parts[1]   # function/statement name
+        mutation_num = '_'.join(parts[2:]) if len(parts) > 2 else None
 
-        # For XMT mutations
-        if mut_type == 'xmt':
-            exact_id = '_'.join([target, number]) if number else target
-            result = exact_id in self.xmt_targets
-            print(f"XMT check: {exact_id} in {self.xmt_targets} = {result}")
-            return result
+        print(f"\nMutation check [{mutant_id}]:")
+        print(f"- Type: {mut_type}")
+        print(f"- Target name: {target_name}")
+        print(f"- Number: {mutation_num}")
+        print(f"- XMT targets: {self.xmt_targets}")
+        print(f"- SDL targets: {self.sdl_targets}")
 
-        # For SDL mutations    
-        if mut_type == 'sdl':
-            stmt_type = target
-            result = stmt_type in self.sdl_targets
-            print(f"SDL check: {stmt_type} in {self.sdl_targets} = {result}")
-            return result
+        for mutant in self.enabled_mutants:
+            if mutant['type'] == mut_type:
+                if mut_type == 'xmt':
+                    if mutant['target'] == '*':
+                        print(f"- XMT wildcard match")
+                        return True
+                    target_match = mutant['target'] == f"{target_name}_{mutation_num}"
+                    print(f"- XMT specific match: {target_match}")
+                    return target_match
+                else:  # SDL
+                    target_match = target_name in mutant.get('target', [])
+                    print(f"- SDL match: {target_match}")
+                    return target_match
 
-        print("Result: No matching mutation type")
+        print(f"- No matching mutation found")
         return False
