@@ -23,6 +23,8 @@ class MutantInserter(ast.NodeTransformer):
         self.counters = {'xmt': 1, 'for': 1, 'if': 1}
         self.nodes_visited = {'if': 0, 'for': 0}
         self.is_class_based = False  # Track if code is class-based
+        self.current_module = None  # Track current module name
+        self.current_function = None  # Track current function
         self.process_mutants()
         logger.info(f"Initialized with targets - XMT: {self.xmt_targets}, SDL: {self.sdl_targets}")
 
@@ -79,6 +81,12 @@ class MutantInserter(ast.NodeTransformer):
 
     def visit_Module(self, node):
         """Add necessary imports for procedural code"""
+        # Set current module name from file being processed
+        if hasattr(node, 'filename'):
+            self.current_module = Path(node.filename).stem
+        else:
+            self.current_module = "unknown_module"
+        
         self._check_code_context(node)
         
         if not self.is_class_based:
@@ -138,6 +146,9 @@ class MutantInserter(ast.NodeTransformer):
 
     def visit_FunctionDef(self, node):
         """Handle XMT mutations at the function level"""
+        # Set current function name
+        self.current_function = node.name
+        
         has_xmt = node.body and isinstance(node.body[0], ast.If) and self.is_xmt_mutation(node.body[0])
         
         self.generic_visit(node)
@@ -149,10 +160,8 @@ class MutantInserter(ast.NodeTransformer):
             mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
             self.counters['xmt'] += 1
 
-            # Analyze function to determine appropriate return value
             return_value = self._analyze_return_value(node)
 
-            # Create mutation check
             plugin_ref = "self.plugin" if self.is_class_based else "plugin"
             mutation_check = ast.If(
                 test=ast.Call(
@@ -167,7 +176,7 @@ class MutantInserter(ast.NodeTransformer):
                 body=[
                     ast.Expr(value=ast.Call(
                         func=ast.Name(id='print', ctx=ast.Load()),
-                        args=[ast.Constant(s=f'XMT: Removing body of function {node.name}')],
+                        args=[ast.Constant(value=f'XMT: Removing body of function {node.name}')],
                         keywords=[]
                     )),
                     ast.Return(value=return_value)
@@ -180,28 +189,19 @@ class MutantInserter(ast.NodeTransformer):
         
         return node
 
-
     def visit_If(self, node):
-        """
-        Handle SDL mutations for if statements while preserving XMT mutations.
-        """
+        """Handle SDL mutations for if statements"""
         self.nodes_visited['if'] += 1
-        logger.debug(f"Visiting If node #{self.nodes_visited['if']}")
-
-        # Skip if this is an XMT mutation check
+        
         if self.is_xmt_mutation(node):
-            logger.debug("Preserving XMT mutation check")
             return node
 
-        # Visit children first
         node = self.generic_visit(node)
         
-        # Add SDL mutation if targeted
         if 'if' in self.sdl_targets:
-            mutation_id = f"sdl_if_{self.counters['if']}"
+            mutation_id = f"sdl_if_{self.current_module}_{self.current_function}_{self.counters['if']}"
             self.counters['if'] += 1
             
-            # Create context-aware mutation check
             plugin_ref = "self.plugin" if self.is_class_based else "plugin"
             mutation_check = ast.parse(
                 f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
@@ -209,38 +209,29 @@ class MutantInserter(ast.NodeTransformer):
                 f"    pass"
             ).body[0]
             
-            logger.info(f"Added SDL mutation {mutation_id} to if statement")
+            logger.info(f"Added SDL mutation {mutation_id} to if statement in {self.current_function}")
             
-            # Create if statement with mutated check and original as else
             mutated_if = ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
                 orelse=[node]
             )
             
-            # Copy source location info for better error reporting
             ast.copy_location(mutated_if, node)
             return mutated_if
         
         return node
 
-
     def visit_For(self, node):
-        """
-        Handle SDL mutations for for loops while preserving other mutations.
-        """
+        """Handle SDL mutations for for loops"""
         self.nodes_visited['for'] += 1
-        logger.debug(f"Visiting For node #{self.nodes_visited['for']}")
-
-        # Visit children first to handle any nested mutations
+        
         node = self.generic_visit(node)
         
-        # Add SDL mutation if targeted
         if 'for' in self.sdl_targets:
-            mutation_id = f"sdl_for_{self.counters['for']}"
+            mutation_id = f"sdl_for_{self.current_module}_{self.current_function}_{self.counters['for']}"
             self.counters['for'] += 1
             
-            # Create context-aware mutation check
             plugin_ref = "self.plugin" if self.is_class_based else "plugin"
             mutation_check = ast.parse(
                 f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
@@ -248,16 +239,14 @@ class MutantInserter(ast.NodeTransformer):
                 f"    pass"
             ).body[0]
             
-            logger.info(f"Added SDL mutation {mutation_id} to for loop")
+            logger.info(f"Added SDL mutation {mutation_id} to for loop in {self.current_function}")
             
-            # Create if statement wrapping the for loop
             mutated_for = ast.If(
                 test=mutation_check.test,
                 body=mutation_check.body,
                 orelse=[node]
             )
             
-            # Copy location information
             ast.copy_location(mutated_for, node)
             return mutated_for
         
