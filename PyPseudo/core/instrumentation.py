@@ -252,8 +252,7 @@ class MutantInserter(ast.NodeTransformer):
         
         return node
 
-
-def instrument_code(source_code, plugin_name, mutants):
+def instrument_code(source_code, plugin_name, mutants, filename=None):
     """
     Main instrumentation function that processes source code and adds mutations.
     
@@ -261,13 +260,19 @@ def instrument_code(source_code, plugin_name, mutants):
         source_code: The source code to instrument
         plugin_name: Name of the mutation plugin
         mutants: Mutation configurations to apply
+        filename: Name of the source file being processed
     
     Returns:
         str: The instrumented source code
     """
     logger.info("Starting code instrumentation")
     try:
+        # Parse the source code into an AST
         tree = ast.parse(source_code)
+        
+        # Add filename information to the AST
+        if filename:
+            tree.filename = filename.replace('.py', '')  # Remove .py extension
         
         # Create and run the mutant inserter
         inserter = MutantInserter(plugin_name, mutants)
@@ -336,7 +341,9 @@ def plugin():
             source_code = support_code + '\n' + source_code
 
         else:
-            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants)
+            # Get the actual filename for module identification
+            filename = Path(input_file).name
+            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
             source_code = mutated_code
 
         with open(input_file, 'w') as f:
