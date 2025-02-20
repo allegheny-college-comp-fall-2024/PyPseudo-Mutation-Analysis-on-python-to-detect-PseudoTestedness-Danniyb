@@ -86,6 +86,10 @@ class MutantInserter(ast.NodeTransformer):
 
     def visit_Module(self, node):
         """Add necessary imports and plugin initialization for source files"""
+        # Get module name from the AST
+        self.current_module = getattr(node, 'module_name', 'unknown_module')
+        logger.info(f"Processing module: {self.current_module}")
+        
         self._check_code_context(node)
 
         # Add imports and setup code for all files
@@ -251,7 +255,7 @@ class MutantInserter(ast.NodeTransformer):
                 
         return node
 
-def instrument_code(source_code, plugin_name, mutants, filename=None):
+def instrument_code(source_code, plugin_name, mutants, module_name=None):
     """
     Main instrumentation function that processes source code and adds mutations.
     
@@ -259,7 +263,7 @@ def instrument_code(source_code, plugin_name, mutants, filename=None):
         source_code: The source code to instrument
         plugin_name: Name of the mutation plugin
         mutants: Mutation configurations to apply
-        filename: Name of the source file being processed
+        module_name: Name of the source file being processed
     
     Returns:
         str: The instrumented source code
@@ -269,9 +273,12 @@ def instrument_code(source_code, plugin_name, mutants, filename=None):
         # Parse the source code into an AST
         tree = ast.parse(source_code)
         
-        # Add filename information to the AST
-        if filename:
-            tree.filename = filename.replace('.py', '')  # Remove .py extension
+        # Ensure module name is set
+        if module_name:
+            tree.module_name = module_name
+        else:
+            tree.module_name = "unknown_module"
+            logger.warning("No module name provided, using 'unknown_module'")
         
         # Create and run the mutant inserter
         inserter = MutantInserter(plugin_name, mutants)
@@ -298,7 +305,11 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
+        # Get module name from file path
+        module_name = Path(input_file).stem  # Get filename without extension
+
+
+        is_test_file = module_name.startswith('test_') or 'test' in module_name
         if is_test_file:
             # Parse the source code to get original imports
             tree = ast.parse(source_code)
