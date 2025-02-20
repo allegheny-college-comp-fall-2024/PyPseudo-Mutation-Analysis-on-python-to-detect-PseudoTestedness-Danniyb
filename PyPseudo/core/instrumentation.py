@@ -71,50 +71,57 @@ class MutantInserter(ast.NodeTransformer):
 
     def _create_mutation_check(self, mutation_id, message):
         """Create appropriate mutation check based on context"""
-        plugin_ref = "self.plugin" if self.is_class_based else "plugin"
+        if self.is_class_based:
+            plugin_ref = "self.plugin"
+        else:
+            # For non-class contexts, the mutation check needs to be inside a function
+            plugin_ref = "plugin"
+            
+        # Create the mutation check without referring to plugin at module level
         return ast.parse(
             f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
-            f"    print({message!r})\n"
-            f"    return None"
+            f"    print('SDL: {message}')\n"
+            f"    pass"
         ).body[0]
-    
 
     def visit_Module(self, node):
-        """Add necessary imports for procedural code"""
-        # Set current module name from file being processed
-        if hasattr(node, 'filename'):
-            self.current_module = Path(node.filename).stem
-        else:
-            self.current_module = "unknown_module"
-        
+        """Add necessary imports and plugin initialization for source files"""
         self._check_code_context(node)
-        
-        if not self.is_class_based:
-            # Add imports and setup code for procedural modules
-            import_code = '''
+
+        # Add imports and setup code for all files
+        import_code = '''
     import os
     import sys
     from pathlib import Path
 
-    # Add local .pypseudo directory to path
+    # Add path to mutation support
     _support_dir = Path(__file__).parent / '.pypseudo'
-    if _support_dir.exists():
+    if _support_dir.exists() and str(_support_dir) not in sys.path:
         sys.path.insert(0, str(_support_dir))
 
-    # Import from local support directory
-    from mutation_support import MutationPlugin, is_mutant_enabled
+    from mutation_support import MutationPlugin
 
-    # Initialize plugin with local config
+    # Initialize plugin
     plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
-    plugin.load_mutants()  # Load mutation configuration'''
+    plugin.load_mutants()
+    '''
+        # Parse the imports with dedent to remove any leading whitespace
+        from textwrap import dedent
+        imports = ast.parse(dedent(import_code).strip()).body
 
-            # Parse the imports with dedent to remove any leading whitespace
-            from textwrap import dedent
-            imports = ast.parse(dedent(import_code).strip()).body
-            
-            # Add imports at the start of the module
-            node.body = imports + node.body
+        # Preserve existing imports and add our imports at the start
+        existing_imports = []
+        other_code = []
+        
+        for item in node.body:
+            if isinstance(item, (ast.Import, ast.ImportFrom)):
+                existing_imports.append(item)
+            else:
+                other_code.append(item)
                 
+        # Combine everything in the right order
+        node.body = imports + existing_imports + other_code
+                    
         return self.generic_visit(node)
     
                         
@@ -199,27 +206,23 @@ class MutantInserter(ast.NodeTransformer):
         node = self.generic_visit(node)
         
         if 'if' in self.sdl_targets:
-            mutation_id = f"sdl_if_{self.current_module}_{self.current_function}_{self.counters['if']}"
-            self.counters['if'] += 1
-            
-            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
-            mutation_check = ast.parse(
-                f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
-                f"    print('SDL: Skipping if statement')\n"
-                f"    pass"
-            ).body[0]
-            
-            logger.info(f"Added SDL mutation {mutation_id} to if statement in {self.current_function}")
-            
-            mutated_if = ast.If(
-                test=mutation_check.test,
-                body=mutation_check.body,
-                orelse=[node]
-            )
-            
-            ast.copy_location(mutated_if, node)
-            return mutated_if
-        
+            # Only add mutation check if we're inside a function
+            if hasattr(self, 'current_function') and self.current_function:
+                mutation_id = f"sdl_if_{self.current_module}_{self.current_function}_{self.counters['if']}"
+                self.counters['if'] += 1
+                
+                mutation_check = self._create_mutation_check(mutation_id, "Skipping if statement")
+                
+                mutated_if = ast.If(
+                    test=mutation_check.test,
+                    body=mutation_check.body,
+                    orelse=[node]
+                )
+                
+                ast.copy_location(mutated_if, node)
+                logger.info(f"Added SDL mutation {mutation_id} to if statement in {self.current_function}")
+                return mutated_if
+                
         return node
 
     def visit_For(self, node):
@@ -229,27 +232,23 @@ class MutantInserter(ast.NodeTransformer):
         node = self.generic_visit(node)
         
         if 'for' in self.sdl_targets:
-            mutation_id = f"sdl_for_{self.current_module}_{self.current_function}_{self.counters['for']}"
-            self.counters['for'] += 1
-            
-            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
-            mutation_check = ast.parse(
-                f"if {plugin_ref}.is_mutant_enabled('{mutation_id}'):\n"
-                f"    print('SDL: Skipping for loop')\n"
-                f"    pass"
-            ).body[0]
-            
-            logger.info(f"Added SDL mutation {mutation_id} to for loop in {self.current_function}")
-            
-            mutated_for = ast.If(
-                test=mutation_check.test,
-                body=mutation_check.body,
-                orelse=[node]
-            )
-            
-            ast.copy_location(mutated_for, node)
-            return mutated_for
-        
+            # Only add mutation check if we're inside a function
+            if hasattr(self, 'current_function') and self.current_function:
+                mutation_id = f"sdl_for_{self.current_module}_{self.current_function}_{self.counters['for']}"
+                self.counters['for'] += 1
+                
+                mutation_check = self._create_mutation_check(mutation_id, "Skipping for loop")
+                
+                mutated_for = ast.If(
+                    test=mutation_check.test,
+                    body=mutation_check.body,
+                    orelse=[node]
+                )
+                
+                ast.copy_location(mutated_for, node)
+                logger.info(f"Added SDL mutation {mutation_id} to for loop in {self.current_function}")
+                return mutated_for
+                
         return node
 
 def instrument_code(source_code, plugin_name, mutants, filename=None):
@@ -290,10 +289,6 @@ def instrument_code(source_code, plugin_name, mutants, filename=None):
 def run_instrumentation(input_file, mutant_file):
     """
     Orchestrates the complete instrumentation process for a file.
-    
-    Args:
-        input_file: Path to the Python file to instrument
-        mutant_file: Path to the mutation configuration file
     """
     try:
         with open(mutant_file) as f:
@@ -305,11 +300,28 @@ def run_instrumentation(input_file, mutant_file):
 
         is_test_file = Path(input_file).name.startswith('test_') or 'test' in Path(input_file).name
         if is_test_file:
-            # Remove old imports and fixtures
+            # Parse the source code to get original imports
+            tree = ast.parse(source_code)
+            original_imports = []
+            seen_imports = set()  # Track unique imports
+            
+            for node in tree.body:
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    # Skip mutation-related imports
+                    if isinstance(node, ast.ImportFrom) and node.module in ['mutation_plugin', 'mutation_support']:
+                        continue
+                    
+                    import_str = astor.to_source(node).strip()
+                    if import_str not in seen_imports:
+                        original_imports.append(import_str)
+                        seen_imports.add(import_str)
+
+            # Remove all existing imports and fixtures
             source_code = re.sub(
-                r'from mutation_plugin import MutationPlugin.*?\n',
+                r'import\s+.*?\n|from\s+.*?import.*?\n',
                 '',
-                source_code
+                source_code,
+                flags=re.MULTILINE
             )
             source_code = re.sub(
                 r'@pytest\.fixture\s*\ndef plugin\(\).*?return plugin\s*\n',
@@ -318,27 +330,40 @@ def run_instrumentation(input_file, mutant_file):
                 flags=re.DOTALL
             )
 
-            # Add the new imports and fixture
+            # Create support code with corrected paths
             support_code = """import os
 import sys
 import pytest
 from pathlib import Path
-from calculator import Calculator
 
-# Add path to mutation support
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# Add src directory to Python path
+src_dir = project_root / 'src'
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# Add mutation support to path
 support_dir = Path(__file__).parent / '.pypseudo'
-if support_dir.exists():
+if support_dir.exists() and str(support_dir) not in sys.path:
     sys.path.insert(0, str(support_dir))
 
 from mutation_support import MutationPlugin
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def plugin():
     plugin = MutationPlugin(str(Path(__file__).parent / '.pypseudo' / 'mutants.json'))
     plugin.load_mutants()
     return plugin
 """
-            source_code = support_code + '\n' + source_code
+            # Add original imports after the support code
+            if original_imports:
+                support_code += "\n" + "\n".join(sorted(original_imports)) + "\n"
+
+            source_code = support_code + '\n' + source_code.strip()
 
         else:
             # Get the actual filename for module identification

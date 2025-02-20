@@ -24,9 +24,24 @@ def setup_project_environment(project_path):
     working_dir = project_path.parent / f"{project_path.name}_pypseudo_work"
     working_dir.mkdir(exist_ok=True)
     
-    # Copy project files
+    # Create .pypseudo directory
+    pypseudo_dir = working_dir / '.pypseudo'
+    pypseudo_dir.mkdir(exist_ok=True)
+    
+    # Create __init__.py files in key directories
+    for dir_path in [working_dir, working_dir / 'src', working_dir / 'tests']:
+        dir_path.mkdir(exist_ok=True)
+        init_file = dir_path / '__init__.py'
+        if not init_file.exists():
+            init_file.touch()
+
+    # Copy mutation support files
+    with open(pypseudo_dir / '__init__.py', 'w') as f:
+        f.write('')  # Empty __init__.py to make it a package
+    
+    # Copy project files maintaining directory structure
     for item in project_path.glob("**/*"):
-        if item.is_file():
+        if item.is_file() and not item.name.startswith('__pycache__'):
             relative_path = item.relative_to(project_path)
             target_path = working_dir / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
