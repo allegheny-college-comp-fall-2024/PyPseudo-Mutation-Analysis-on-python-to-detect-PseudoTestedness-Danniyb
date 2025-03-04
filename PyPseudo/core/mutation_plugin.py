@@ -72,7 +72,7 @@ class MutationPlugin:
 
     def is_mutant_enabled(self, mutant_id):
         """Check if mutation is enabled for given ID"""
-        if not self.config.get('enable_mutation', False):
+        if not hasattr(self, 'config') or not self.config.get('enable_mutation', False):
             print(f"\nMutation check [{mutant_id}]: disabled globally")
             return False
 

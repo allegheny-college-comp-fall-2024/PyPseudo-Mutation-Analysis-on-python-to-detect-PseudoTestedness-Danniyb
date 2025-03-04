@@ -1,3 +1,4 @@
+import astor
 import pytest
 import argparse
 import logging
@@ -370,7 +371,7 @@ def run_all_mutations(args, pytest_args):
     for mut in sorted(all_mutations['xmt'], key=lambda x: (x['file'], x['function'], x['number'])):
         mutation_id = mut['id']
         print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
-        result = run_single_mutation_test(args, mutation_id, pytest_args)
+        result = run_single_mutation_test(args, mutation_id, pytest_args, working_dir)
         results[mutation_id] = {
             'passed': result == 0,
             'file': mut['file'],
