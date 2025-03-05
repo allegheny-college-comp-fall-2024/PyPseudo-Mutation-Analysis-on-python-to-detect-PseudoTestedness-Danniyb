@@ -683,6 +683,14 @@ def main():
 
     args = parser.parse_args()
 
+    # Check if pypseudo_instrumentation is installed
+    try:
+        import pypseudo_instrumentation
+    except ImportError:
+        logger.error("ERROR: pypseudo_instrumentation package is not installed.")
+        logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
+        return
+
     # Prepare pytest arguments
     pytest_args = []
     if args.json_report:
@@ -707,7 +715,7 @@ def main():
 
         if args.list_mutations:
             if working_dir.exists():
-                list_available_mutations(args, working_dir)
+                list_available_mutations(args)
             else:
                 logger.error("No instrumented version found. Run --instrument first.")
             return
@@ -726,7 +734,10 @@ def main():
         if args.instrument:
             logger.info("Running instrumentation...")
             working_dir = process_project(project_path, args.mutant_file)
-            logger.info("Instrumentation complete")
+            if working_dir:
+                logger.info("Instrumentation complete")
+            else:
+                logger.error("Instrumentation failed")
             return
 
         if args.run:
@@ -735,6 +746,9 @@ def main():
                 return
                 
             logger.info("Running tests...")
+            # Set environment variable for config path
+            os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
+            
             result = run_tests(args.mutant_file, pytest_args, working_dir)
 
             if result == 0:
@@ -748,6 +762,9 @@ def main():
                 logger.error("No instrumented version found. Run --instrument first.")
                 return
                 
+            # Set environment variable for config path
+            os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
+            
             results = run_all_mutations(args, pytest_args, working_dir)
             generate_mutation_report(results)
             return
