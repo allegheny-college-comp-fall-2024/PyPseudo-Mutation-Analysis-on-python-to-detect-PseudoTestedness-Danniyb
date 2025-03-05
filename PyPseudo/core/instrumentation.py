@@ -135,14 +135,10 @@ class MutantInserter(ast.NodeTransformer):
 
             return_value = self._analyze_return_value(node)
 
-            plugin_ref = "self.plugin" if self.is_class_based else "plugin"
+            # Use the global is_mutant_enabled function instead of any instance attributes
             mutation_check = ast.If(
                 test=ast.Call(
-                    func=ast.Attribute(
-                        value=ast.Name(id=plugin_ref, ctx=ast.Load()),
-                        attr='is_mutant_enabled',
-                        ctx=ast.Load()
-                    ),
+                    func=ast.Name(id='is_mutant_enabled', ctx=ast.Load()),
                     args=[ast.Str(s=mutation_id)],
                     keywords=[]
                 ),
@@ -216,6 +212,116 @@ class MutantInserter(ast.NodeTransformer):
                 return mutated_for
                 
         return node
+    
+class SafeMutantInserter(ast.NodeVisitor):
+    """
+    A specialized NodeVisitor for safe instrumentation of code with metaclasses.
+    Only handles function-level (XMT) mutations to avoid metaclass conflicts.
+    """
+    
+    def __init__(self, plugin_name, mutants):
+        super().__init__()
+        self.plugin_name = plugin_name
+        self.mutants = mutants
+        self.xmt_targets = set()
+        self.counters = {'xmt': 1}
+        self.current_function = None
+        self.process_mutants()
+        
+    def process_mutants(self):
+        """Process mutation configuration"""
+        for mutant in self.mutants:
+            if mutant['type'] == 'xmt':
+                if mutant['target'] == '*':
+                    self.xmt_targets.add('*')
+                else:
+                    self.xmt_targets.add(mutant['target'])
+        
+        logger.info(f"Initialized with targets - XMT: {self.xmt_targets}")
+    
+    def visit_Module(self, node):
+        """Visit module but do not modify its structure"""
+        self.generic_visit(node)
+        return node
+        
+    def visit_FunctionDef(self, node):
+        """Handle XMT mutations at the function level"""
+        # Skip methods inside classes to avoid metaclass issues
+        in_class = False
+        for parent in ast.walk(node):
+            if isinstance(parent, ast.ClassDef):
+                in_class = True
+                break
+                
+        if in_class:
+            self.generic_visit(node)
+            return node
+            
+        # Set current function name
+        self.current_function = node.name
+        
+        # Check if this function already has an XMT mutation
+        has_xmt = False
+        if node.body and isinstance(node.body[0], ast.If):
+            try:
+                test_str = astor.to_source(node.body[0].test).strip()
+                has_xmt = "is_mutant_enabled" in test_str and "xmt_" in test_str
+            except:
+                pass
+        
+        self.generic_visit(node)
+        
+        # Skip special methods
+        if node.name.startswith('__') and node.name.endswith('__'):
+            return node
+                
+        # If not already instrumented and matches targets
+        if not has_xmt and ('*' in self.xmt_targets or node.name in self.xmt_targets):
+            mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
+            self.counters['xmt'] += 1
+
+            # Determine appropriate return value
+            return_value = None
+            for stmt in node.body:
+                if isinstance(stmt, ast.Return) and hasattr(stmt, 'value') and stmt.value:
+                    if isinstance(stmt.value, ast.Constant):
+                        return_value = ast.Constant(value=None)
+                    elif isinstance(stmt.value, ast.Num):
+                        return_value = ast.Constant(value=0)
+                    elif isinstance(stmt.value, ast.List):
+                        return_value = ast.List(elts=[], ctx=ast.Load())
+                    elif isinstance(stmt.value, ast.Dict):
+                        return_value = ast.Dict(keys=[], values=[])
+                    else:
+                        return_value = ast.Constant(value=None)
+                    break
+            
+            if not return_value:
+                # No return found, use None
+                return_value = ast.Constant(value=None)
+
+            # Create the mutation check
+            mutation_check = ast.If(
+                test=ast.Call(
+                    func=ast.Name(id='is_mutant_enabled', ctx=ast.Load()),
+                    args=[ast.Str(s=mutation_id)],
+                    keywords=[]
+                ),
+                body=[
+                    ast.Expr(value=ast.Call(
+                        func=ast.Name(id='print', ctx=ast.Load()),
+                        args=[ast.Constant(value=f'XMT: Removing body of function {node.name}')],
+                        keywords=[]
+                    )),
+                    ast.Return(value=return_value)
+                ],
+                orelse=[]
+            )
+            
+            node.body.insert(0, mutation_check)
+            logger.info(f"Added XMT mutation {mutation_id} to function {node.name}")
+        
+        return node
 
 def instrument_code(source_code, plugin_name, mutants, module_name=None):
     """
@@ -255,9 +361,53 @@ def instrument_code(source_code, plugin_name, mutants, module_name=None):
         logger.error(f"Error during instrumentation: {str(e)}")
         raise
 
-def run_instrumentation(input_file, mutant_file):
+def instrument_code_safe(source_code, plugin_name, mutants, module_name=None):
+    """
+    Safe instrumentation function for code with metaclasses.
+    Only instruments function-level mutations to avoid metaclass conflicts.
+    
+    Args:
+        source_code: The source code to instrument
+        plugin_name: Name of the mutation plugin
+        mutants: Mutation configurations to apply
+        module_name: Name of the source file being processed
+    
+    Returns:
+        str: The instrumented source code
+    """
+    logger.info("Starting safe code instrumentation")
+    try:
+        # Parse the source code into an AST
+        tree = ast.parse(source_code)
+        
+        # Ensure module name is set
+        if module_name:
+            tree.module_name = module_name
+        else:
+            tree.module_name = "unknown_module"
+            logger.warning("No module name provided, using 'unknown_module'")
+        
+        # Create a specialized mutant inserter for safe mode
+        inserter = SafeMutantInserter(plugin_name, mutants)
+        mutated_tree = inserter.visit(tree)
+        
+        # Fix locations in the AST after modifications
+        ast.fix_missing_locations(mutated_tree)
+        
+        logger.info("Safe code instrumentation completed successfully")
+        return astor.to_source(mutated_tree)
+    except Exception as e:
+        logger.error(f"Error during safe instrumentation: {str(e)}")
+        raise
+
+def run_instrumentation(input_file, mutant_file, safe_mode=False):
     """
     Orchestrates the complete instrumentation process for a file.
+    
+    Args:
+        input_file: Path to the file to instrument
+        mutant_file: Path to the mutation configuration
+        safe_mode: Whether to use conservative instrumentation for complex projects
     """
     try:
         # Check if pypseudo_instrumentation is installed
@@ -275,6 +425,9 @@ def run_instrumentation(input_file, mutant_file):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
+        # Check for metaclass usage (for safe mode)
+        has_metaclass = "metaclass" in source_code or "ABCMeta" in source_code
+        
         # Get module name from file path
         module_name = Path(input_file).stem
         # Get the actual filename for module identification
@@ -283,7 +436,6 @@ def run_instrumentation(input_file, mutant_file):
         is_test_file = module_name.startswith('test_') or 'test' in module_name
 
         # First, remove any existing mutation support imports
-        # This is critical to prevent importing both old and new approaches
         source_code = re.sub(
             r'import os.*?from mutation_support import.*?plugin\.load_mutants\(\).*?\n',
             '',
@@ -364,20 +516,23 @@ def plugin():
             import_header = """# PyPseudo instrumentation imports
 import os
 from pathlib import Path
-from pypseudo_instrumentation import MutationPlugin, is_mutant_enabled
+from pypseudo_instrumentation import is_mutant_enabled
 
 # Set environment variable for config file location
 os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
-# Initialize the plugin
-plugin = MutationPlugin(str(Path(__file__).parent / '.pypseudo' / 'mutants.json'))
-plugin.load_mutants()
 
 """
             # Combine import header with original source
             source_code = import_header + source_code
             
-            # Now use the filename variable we defined earlier
-            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
+            # If we're in safe mode and the file uses metaclasses, use function-only instrumentation
+            if safe_mode and has_metaclass:
+                # Use a specialized instrumentation approach for metaclass-heavy code
+                mutated_code = instrument_code_safe(source_code, 'plugin', enabled_mutants, filename)
+            else:
+                # Use normal instrumentation
+                mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
+                
             source_code = mutated_code
 
         with open(input_file, 'w') as f:
@@ -387,13 +542,14 @@ plugin.load_mutants()
         logger.error(f"Error during instrumentation: {e}")
         raise
 
-def process_project(project_path, mutant_file):
+def process_project(project_path, mutant_file, safe_mode=False):
     """
     Process an entire project for instrumentation
     
     Args:
         project_path: Path to the project
         mutant_file: Path to mutation configuration
+        safe_mode: Whether to use conservative instrumentation for complex projects
     """
     try:
         # Check if pypseudo_instrumentation is installed
@@ -429,13 +585,12 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
         # Process Python files
         for py_file in working_dir.glob("**/*.py"):
             if '.pypseudo' not in str(py_file) and py_file.name != '__init__.py':
-                run_instrumentation(py_file, mutant_file)
+                run_instrumentation(py_file, mutant_file, safe_mode=safe_mode)
                 
         return working_dir
     except Exception as e:
         logger.error(f"Error processing project: {e}")
         raise
-
 
 def restore_original(file_path, backup_path):
     """Restore the original code from backup - file-based restore"""

@@ -1,4 +1,4 @@
-import astor
+import astor 
 import pytest
 import argparse
 import logging
@@ -663,6 +663,8 @@ def main():
     # Project path and mutation flags
     parser.add_argument('--project-path', required=True,
                        help='Path to the project to analyze')
+    parser.add_argument('--safe-mode', action='store_true',
+                   help='Use conservative instrumentation for complex libraries with metaclasses')
     parser.add_argument('--xmt', action='store_true',
                        help='Use extreme mutation testing only')
     parser.add_argument('--sdl', action='store_true',
@@ -733,7 +735,7 @@ def main():
 
         if args.instrument:
             logger.info("Running instrumentation...")
-            working_dir = process_project(project_path, args.mutant_file)
+            working_dir = process_project(project_path, args.mutant_file, safe_mode=args.safe_mode)
             if working_dir:
                 logger.info("Instrumentation complete")
             else:
