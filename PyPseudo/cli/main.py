@@ -513,6 +513,9 @@ def run_tests(mutant_file, pytest_args, target_path=None):
         # Write updated config to work directory
         with open(work_mutants_file, 'w') as f:
             json.dump(current_config, f, indent=2)
+            
+        # Set environment variable for config path
+        os.environ['PYPSEUDO_CONFIG_FILE'] = str(work_mutants_file)
 
         plugin = MutationPlugin(str(work_mutants_file))
         plugin.load_mutants()
