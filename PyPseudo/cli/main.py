@@ -306,7 +306,7 @@ def list_available_mutations(args):
     else:
         print("    None found")
 
-def run_single_mutation_test(args, mutation_id, pytest_args):
+def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
     """
     Run tests with a single mutation enabled.
     
@@ -314,6 +314,7 @@ def run_single_mutation_test(args, mutation_id, pytest_args):
         args: Command line arguments
         mutation_id: ID of mutation to test
         pytest_args: Additional pytest arguments
+        working_dir: Path to working directory
     
     Returns:
         int: Test result (0 for pass, non-zero for fail)
@@ -329,8 +330,13 @@ def run_single_mutation_test(args, mutation_id, pytest_args):
         with open(args.mutant_file, 'w') as f:
             json.dump(mutants_config, f, indent=4)
             
+        # Set environment variable for config path
+        if working_dir:
+            config_path = str(working_dir / '.pypseudo' / 'mutants.json')
+            os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+            
         # Run tests
-        return run_tests(args.mutant_file, pytest_args)
+        return run_tests(args.mutant_file, pytest_args, working_dir)
         
     except Exception as e:
         logger.error(f"Error running mutation {mutation_id}: {e}")
