@@ -288,7 +288,9 @@ def instrument_code(source_code, plugin_name, mutants, module_name=None):
         raise
 
 def run_instrumentation(input_file, mutant_file):
-    """Orchestrates the complete instrumentation process for a file."""
+    """
+    Orchestrates the complete instrumentation process for a file.
+    """
     try:
         with open(mutant_file) as f:
             mutants_data = json.load(f)
@@ -298,20 +300,20 @@ def run_instrumentation(input_file, mutant_file):
             source_code = f.read()
 
         # Get module name from file path
-        module_name = Path(input_file).stem
+        module_name = Path(input_file).stem  # Get filename without extension
 
         is_test_file = module_name.startswith('test_') or 'test' in module_name
         if is_test_file:
-            # For test files
+            # Handle test files
             # Parse the source code to get original imports
             tree = ast.parse(source_code)
             original_imports = []
-            seen_imports = set()
+            seen_imports = set()  # Track unique imports
             
             for node in tree.body:
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     # Skip mutation-related imports
-                    if isinstance(node, ast.ImportFrom) and node.module in ['mutation_plugin', 'mutation_support']:
+                    if isinstance(node, ast.ImportFrom) and node.module in ['mutation_plugin', 'mutation_support', 'pypseudo_instrumentation']:
                         continue
                     
                     import_str = astor.to_source(node).strip()
@@ -319,7 +321,7 @@ def run_instrumentation(input_file, mutant_file):
                         original_imports.append(import_str)
                         seen_imports.add(import_str)
 
-            # Remove existing imports and fixtures
+            # Remove all existing imports and fixtures
             source_code = re.sub(
                 r'import\s+.*?\n|from\s+.*?import.*?\n',
                 '',
@@ -344,12 +346,19 @@ from pypseudo_instrumentation import MutationPlugin
 
 @pytest.fixture(scope='session')
 def plugin():
+    """
+            # Add code to set environment variable for config file
+            support_code += """
+    # Set path to config file
     config_path = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
     os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+    
+    # Create and initialize plugin
     plugin = MutationPlugin(config_path)
     plugin.load_mutants()
     return plugin
 """
+            
             # Add original imports after the support code
             if original_imports:
                 support_code += "\n" + "\n".join(sorted(original_imports)) + "\n"
@@ -357,18 +366,24 @@ def plugin():
             source_code = support_code + '\n' + source_code.strip()
 
         else:
-            # For regular Python files - add imports at the top
-            import_header = """# Import from pypseudo_instrumentation package
+            # For regular Python files
+            # Add imports at the top
+            import_header = """# PyPseudo instrumentation imports
 import os
 from pathlib import Path
 from pypseudo_instrumentation import is_mutant_enabled
 
 # Set environment variable for config file location
 os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
+
 """
-            # Now instrument the code
-            source_code = import_header + source_code
+            # Get the actual filename for module identification
             filename = Path(input_file).name
+            
+            # Combine import header with original source
+            source_code = import_header + source_code
+            
+            # Instrument the code
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
             source_code = mutated_code
 
