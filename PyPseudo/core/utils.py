@@ -89,6 +89,7 @@ plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
     
         
 def copy_support_files(working_dir, mutants_config):
+    """Copy support files to the working directory"""
     support_dir = working_dir / '.pypseudo'
     support_dir.mkdir(exist_ok=True)
     
@@ -102,3 +103,4 @@ def copy_support_files(working_dir, mutants_config):
     
     # We no longer need to copy mutation_support.py
     # as it will be imported from the package
+        

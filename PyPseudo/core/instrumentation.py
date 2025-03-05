@@ -77,7 +77,8 @@ class MutantInserter(ast.NodeTransformer):
             f"    print('SDL: {message}')\n"
             f"    pass"
         ).body[0]
-
+    
+    
     def visit_Module(self, node):
         """Add necessary imports and plugin initialization for source files"""
         # Get module name from the AST
@@ -404,6 +405,14 @@ def process_project(project_path, mutant_file):
         mutant_file: Path to mutation configuration
     """
     try:
+        # Check if pypseudo_instrumentation is installed
+        try:
+            import pypseudo_instrumentation
+        except ImportError:
+            logger.error("ERROR: pypseudo_instrumentation package is not installed.")
+            logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
+            return None
+            
         working_dir = setup_project_environment(project_path)
         
         # Create __init__.py with proper imports
@@ -412,15 +421,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add .pypseudo directory to path
-_support_dir = Path(__file__).parent / '.pypseudo'
-if _support_dir.exists():
-    sys.path.insert(0, str(_support_dir))
-
-# Import mutation support and initialize plugin
-from mutation_support import MutationPlugin, is_mutant_enabled
-plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
-plugin.load_mutants()
+# Set environment variable for config path
+os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
 """
         
         # Create __init__.py in working directory
