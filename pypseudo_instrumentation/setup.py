@@ -5,6 +5,6 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     description="Support package for PyPseudo mutation testing",
-    author="Your Name",
+    author="Daniel Bekele",
     python_requires=">=3.6",
 )

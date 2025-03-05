@@ -92,90 +92,13 @@ def copy_support_files(working_dir, mutants_config):
     support_dir = working_dir / '.pypseudo'
     support_dir.mkdir(exist_ok=True)
     
+    # Create __init__.py to make it a package
+    with open(support_dir / '__init__.py', 'w') as f:
+        f.write('# PyPseudo support package')
+    
+    # Write the config file
     with open(support_dir / 'mutants.json', 'w') as f:
         json.dump(mutants_config, f, indent=2)
-        
-    support_code = '''
-import json
-import os
-from pathlib import Path
-
-class MutationPlugin:
-    def __init__(self, config_file):
-        self.config_file = config_file
-        self.config = {}
-        self.enabled_mutants = []
-        self.xmt_targets = set()
-        self.sdl_targets = set()
-        self.load_config()
     
-    def load_config(self):
-        try:
-            with open(self.config_file) as f:
-                self.config = json.load(f)
-                self._process_mutants()
-        except Exception as e:
-            print(f"Error loading config: {e}")
-            
-    def _process_mutants(self):
-        """Process mutants from config"""
-        if not self.config.get('enable_mutation', False):
-            return
-            
-        self.enabled_mutants = self.config.get('enabled_mutants', [])
-        for mutant in self.enabled_mutants:
-            if mutant['type'] == 'xmt':
-                if mutant['target'] == '*':
-                    self.xmt_targets.add('*')
-                else:
-                    self.xmt_targets.add(mutant['target'])
-            elif mutant['type'] == 'sdl':
-                self.sdl_targets.update(mutant['target'])
-
-    def load_mutants(self):
-        self.load_config()
-            
-    def is_mutant_enabled(self, mutant_id):
-        """Check if mutation is enabled"""
-        if not self.config.get('enable_mutation', False):
-            return False
-
-        parts = mutant_id.split('_')
-        if len(parts) < 2:
-            return False
-            
-        mut_type = parts[0]      # xmt or sdl
-        target_name = '_'.join(parts[1:-1])   # function/statement name
-        mutation_num = parts[-1]  # mutation number
-        
-        # For single mutant case
-        if len(self.enabled_mutants) == 1 and self.enabled_mutants[0].get('target') != '*':
-            if mut_type == 'xmt':
-                return mutant_id == self.enabled_mutants[0]['target']
-            else:  # SDL
-                return target_name in self.enabled_mutants[0]['target']
-
-        # For general case
-        for mutant in self.enabled_mutants:
-            if mutant['type'] == mut_type:
-                if mut_type == 'xmt':
-                    if mutant['target'] == '*':
-                        return True
-                    return target_name == mutant['target']
-                else:  # SDL
-                    return target_name in mutant['target']
-                    
-        return False
-
-_plugin = None
-
-def is_mutant_enabled(mutant_id):
-    """Global helper for mutation checks"""
-    global _plugin
-    if _plugin is None:
-        config_file = str(Path(__file__).parent / 'mutants.json')
-        _plugin = MutationPlugin(config_file)
-    return _plugin.is_mutant_enabled(mutant_id)
-'''
-    with open(support_dir / 'mutation_support.py', 'w') as f:
-        f.write(support_code)
+    # We no longer need to copy mutation_support.py
+    # as it will be imported from the package
