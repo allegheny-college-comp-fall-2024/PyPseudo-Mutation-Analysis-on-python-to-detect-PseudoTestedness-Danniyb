@@ -342,7 +342,7 @@ def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
         logger.error(f"Error running mutation {mutation_id}: {e}")
         return 1
 
-def run_all_mutations(args, pytest_args):
+def run_all_mutations(args, pytest_args, working_dir=None):
     """Run tests with each mutation one by one"""
     # Determine target path and get mutations
     target_path = args.project_path if args.project_path else 'simplePro/newtest.py'
@@ -372,6 +372,10 @@ def run_all_mutations(args, pytest_args):
     
     results = {}
     
+    # Set environment variable for config path
+    if working_dir:
+        os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
+    
     # Run XMT mutations
     print("\nRunning XMT mutations:")
     for mut in sorted(all_mutations['xmt'], key=lambda x: (x['file'], x['function'], x['number'])):
@@ -396,7 +400,7 @@ def run_all_mutations(args, pytest_args):
                          key=lambda x: (x['file'], x['function'], x['lineno'])):
             mutation_id = mut['id']
             print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
-            result = run_single_mutation_test(args, mutation_id, pytest_args)
+            result = run_single_mutation_test(args, mutation_id, pytest_args, working_dir)
             results[mutation_id] = {
                 'passed': result == 0,
                 'file': mut['file'],
