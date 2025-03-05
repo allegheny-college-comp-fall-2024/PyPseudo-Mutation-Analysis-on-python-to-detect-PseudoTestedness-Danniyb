@@ -86,41 +86,8 @@ class MutantInserter(ast.NodeTransformer):
         logger.info(f"Processing module: {self.current_module}")
         
         self._check_code_context(node)
-
-        # Add imports and setup code for all files
-        import_code = '''
-    import os
-    import sys
-    from pathlib import Path
-
-    # Add path to mutation support
-    _support_dir = Path(__file__).parent / '.pypseudo'
-    if _support_dir.exists() and str(_support_dir) not in sys.path:
-        sys.path.insert(0, str(_support_dir))
-
-    from mutation_support import MutationPlugin
-
-    # Initialize plugin
-    plugin = MutationPlugin(str(_support_dir / 'mutants.json'))
-    plugin.load_mutants()
-    '''
-        # Parse the imports with dedent to remove any leading whitespace
-        from textwrap import dedent
-        imports = ast.parse(dedent(import_code).strip()).body
-
-        # Preserve existing imports and add our imports at the start
-        existing_imports = []
-        other_code = []
         
-        for item in node.body:
-            if isinstance(item, (ast.Import, ast.ImportFrom)):
-                existing_imports.append(item)
-            else:
-                other_code.append(item)
-                
-        # Combine everything in the right order
-        node.body = imports + existing_imports + other_code
-                    
+        # We no longer need to add imports here since they're handled in run_instrumentation
         return self.generic_visit(node)
     
                         
@@ -293,6 +260,14 @@ def run_instrumentation(input_file, mutant_file):
     Orchestrates the complete instrumentation process for a file.
     """
     try:
+        # Check if pypseudo_instrumentation is installed
+        try:
+            import pypseudo_instrumentation
+        except ImportError:
+            logger.error("ERROR: pypseudo_instrumentation package is not installed.")
+            logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
+            return
+
         with open(mutant_file) as f:
             mutants_data = json.load(f)
             enabled_mutants = mutants_data.get('enabled_mutants', [])
@@ -301,15 +276,35 @@ def run_instrumentation(input_file, mutant_file):
             source_code = f.read()
 
         # Get module name from file path
-        module_name = Path(input_file).stem  # Get filename without extension
+        module_name = Path(input_file).stem
+        # Get the actual filename for module identification
+        filename = Path(input_file).name
 
         is_test_file = module_name.startswith('test_') or 'test' in module_name
+
+        # First, remove any existing mutation support imports
+        # This is critical to prevent importing both old and new approaches
+        source_code = re.sub(
+            r'import os.*?from mutation_support import.*?plugin\.load_mutants\(\).*?\n',
+            '',
+            source_code,
+            flags=re.DOTALL | re.MULTILINE
+        )
+        
+        # Also remove any individual imports of mutation_support
+        source_code = re.sub(
+            r'from mutation_support import.*?\n',
+            '',
+            source_code,
+            flags=re.MULTILINE
+        )
+
         if is_test_file:
             # Handle test files
             # Parse the source code to get original imports
             tree = ast.parse(source_code)
             original_imports = []
-            seen_imports = set()  # Track unique imports
+            seen_imports = set()
             
             for node in tree.body:
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -347,9 +342,6 @@ from pypseudo_instrumentation import MutationPlugin
 
 @pytest.fixture(scope='session')
 def plugin():
-    """
-            # Add code to set environment variable for config file
-            support_code += """
     # Set path to config file
     config_path = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
     os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
@@ -372,19 +364,19 @@ def plugin():
             import_header = """# PyPseudo instrumentation imports
 import os
 from pathlib import Path
-from pypseudo_instrumentation import is_mutant_enabled
+from pypseudo_instrumentation import MutationPlugin, is_mutant_enabled
 
 # Set environment variable for config file location
 os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
+# Initialize the plugin
+plugin = MutationPlugin(str(Path(__file__).parent / '.pypseudo' / 'mutants.json'))
+plugin.load_mutants()
 
 """
-            # Get the actual filename for module identification
-            filename = Path(input_file).name
-            
             # Combine import header with original source
             source_code = import_header + source_code
             
-            # Instrument the code
+            # Now use the filename variable we defined earlier
             mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
             source_code = mutated_code
 
@@ -394,7 +386,6 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
     except Exception as e:
         logger.error(f"Error during instrumentation: {e}")
         raise
-
 
 def process_project(project_path, mutant_file):
     """
