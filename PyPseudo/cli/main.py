@@ -305,6 +305,8 @@ def list_available_mutations(args):
             print(f"    - {mut['id']} in {mut['function']} at line {mut['lineno']} ({mut['file']})")
     else:
         print("    None found")
+        
+    return combined_mutations
 
 def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
     """
@@ -342,74 +344,216 @@ def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
         logger.error(f"Error running mutation {mutation_id}: {e}")
         return 1
 
-def run_all_mutations(args, pytest_args, working_dir=None):
-    """Run tests with each mutation one by one"""
-    # Determine target path and get mutations
-    target_path = args.project_path if args.project_path else 'simplePro/newtest.py'
-    all_mutations = {
-        'xmt': [],
-        'sdl': {'for': [], 'if': []}
+def collect_coverage_mapping(working_dir, pytest_args):
+    """
+    Collect test coverage data to map tests to mutants.
+    
+    Returns:
+        dict: Coverage mapping with tests, mutants, and their relationships
+    """
+    try:
+        # Create a temporary mutant file that enables coverage collection
+        temp_mutant_file = working_dir / '.pypseudo' / 'coverage_mutants.json'
+        coverage_config = {
+            "enable_mutation": False,  # Initially disable mutations
+            "collect_coverage": True,  # Special flag for coverage collection
+            "enabled_mutants": []
+        }
+        
+        with open(temp_mutant_file, 'w') as f:
+            json.dump(coverage_config, f, indent=2)
+        
+        # Set environment variable to use our coverage config
+        os.environ['PYPSEUDO_CONFIG_FILE'] = str(temp_mutant_file)
+        
+        # Create a pytest plugin to collect coverage
+        class CoverageCollector:
+            def __init__(self):
+                self.test_to_mutants = {}
+                self.mutant_to_tests = {}
+                self.all_tests = set()
+                self.all_mutants = set()
+                self.current_test = None
+            
+            def pytest_runtest_setup(self, item):
+                # Record the current test being executed
+                self.current_test = item.nodeid
+                self.all_tests.add(self.current_test)
+                
+                # Clear covered mutants for this test
+                if self.current_test not in self.test_to_mutants:
+                    self.test_to_mutants[self.current_test] = set()
+            
+            def register_mutant_coverage(self, mutant_id, test_id):
+                # Called by the instrumented code when a mutant is covered
+                test_id = test_id or self.current_test
+                if not test_id:
+                    return
+                    
+                if test_id not in self.test_to_mutants:
+                    self.test_to_mutants[test_id] = set()
+                
+                self.test_to_mutants[test_id].add(mutant_id)
+                self.all_mutants.add(mutant_id)
+                
+                if mutant_id not in self.mutant_to_tests:
+                    self.mutant_to_tests[mutant_id] = set()
+                
+                self.mutant_to_tests[mutant_id].add(test_id)
+        
+        # Create and register our coverage collector
+        collector = CoverageCollector()
+        
+        # Create our plugin to hook into pytest
+        plugin = MutationPlugin(str(temp_mutant_file))
+        plugin.register_coverage_collector(collector)
+        
+        # Add working directory to Python path
+        sys.path.insert(0, str(working_dir))
+        
+        # Run all tests to collect coverage data
+        test_args = list(pytest_args)  # Make a copy
+        
+        # Make sure we're using the right working directory
+        if working_dir not in test_args:
+            test_args.insert(0, str(working_dir))
+        
+        # Run pytest with our collector plugin
+        result = pytest.main(test_args, plugins=[plugin])
+        
+        if result != 0:
+            logger.warning("Some tests failed during coverage collection")
+        
+        # Convert set to list for JSON serialization
+        coverage_data = {
+            'tests': list(collector.all_tests),
+            'mutants': list(collector.all_mutants),
+            'test_coverage': {test: list(mutants) for test, mutants in collector.test_to_mutants.items()},
+            'mutant_coverage': {mutant: list(tests) for mutant, tests in collector.mutant_to_tests.items()}
+        }
+        
+        # Save coverage data for debugging
+        with open(working_dir / '.pypseudo' / 'coverage_data.json', 'w') as f:
+            json.dump(coverage_data, f, indent=2)
+        
+        return coverage_data
+    except Exception as e:
+        logger.error(f"Error collecting coverage: {str(e)}")
+        return {
+            'tests': [],
+            'mutants': [],
+            'test_coverage': {},
+            'mutant_coverage': {}
+        }
+
+def run_test_with_mutants(args, test_id, mutant_ids, pytest_args, working_dir):
+    """
+    Run a specific test with multiple mutants enabled.
+    
+    Args:
+        args: Command line arguments
+        test_id: ID of the test to run
+        mutant_ids: List of mutant IDs to enable
+        pytest_args: Additional pytest arguments
+        working_dir: Path to the instrumented project
+    
+    Returns:
+        dict: Results for each mutant
+    """
+    # Create mutant config with all specified mutants enabled
+    mutants_config = {
+        'enable_mutation': True,
+        'enabled_mutants': []
     }
     
-    # Collect mutations from all files
-    for file_path in get_target_files(target_path):
-        if '.pypseudo' not in str(file_path):
-            try:
-                file_mutations = analyze_code_for_mutations(file_path)
-                # Add file info to mutations
-                for mut in file_mutations['xmt']:
-                    mut['file'] = str(file_path)
-                all_mutations['xmt'].extend(file_mutations['xmt'])
-                
-                for stmt_type in ['for', 'if']:
-                    for mut in file_mutations['sdl'][stmt_type]:
-                        mut['file'] = str(file_path)
-                    all_mutations['sdl'][stmt_type].extend(file_mutations['sdl'][stmt_type])
-                    
-            except Exception as e:
-                logger.error(f"Error analyzing {file_path}: {e}")
-                continue
+    # Group mutants by type (xmt or sdl)
+    xmt_mutants = [m for m in mutant_ids if m.startswith('xmt_')]
+    sdl_mutants = [m for m in mutant_ids if m.startswith('sdl_')]
     
-    results = {}
-    
-    # Set environment variable for config path
-    if working_dir:
-        os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
-    
-    # Run XMT mutations
-    print("\nRunning XMT mutations:")
-    for mut in sorted(all_mutations['xmt'], key=lambda x: (x['file'], x['function'], x['number'])):
-        mutation_id = mut['id']
-        print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
-        result = run_single_mutation_test(args, mutation_id, pytest_args, working_dir)
-        results[mutation_id] = {
-            'passed': result == 0,
-            'file': mut['file'],
-            'function': mut['function'],
+    # Add all mutants to config
+    for mutant_id in xmt_mutants:
+        mutants_config['enabled_mutants'].append({
             'type': 'xmt',
-            'number': mut['number']
+            'target': mutant_id
+        })
+    
+    for mutant_id in sdl_mutants:
+        # Extract statement type from mutant ID (e.g., 'for' from 'sdl_for_123')
+        parts = mutant_id.split('_')
+        if len(parts) > 1:
+            stmt_type = parts[1]
+            mutants_config['enabled_mutants'].append({
+                'type': 'sdl',
+                'target': [stmt_type]
+            })
+    
+    # Write to mutant file
+    with open(args.mutant_file, 'w') as f:
+        json.dump(mutants_config, f, indent=4)
+    
+    # Set environment variable
+    os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
+    
+    # Run the specific test
+    test_args = pytest_args.copy() + [test_id, "-v"]
+    result = run_tests(args.mutant_file, test_args, working_dir)
+    
+    # Process results for each mutant
+    results = {}
+    for mutant_id in mutant_ids:
+        results[mutant_id] = {
+            'passed': result == 0,  # If tests pass, the mutant survived
+            'test': test_id,
+            'type': 'xmt' if mutant_id.startswith('xmt_') else 'sdl'
         }
     
-    # Run SDL mutations
-    print("\nRunning SDL mutations:")
+    return results
+
+
+def run_all_mutations(args, pytest_args, working_dir=None):
+    """
+    Run tests with mutations grouped by test coverage.
+    This is more efficient than running each mutation separately.
+    """
+    logger.info("Collecting test coverage data...")
     
-    # Process both for and if mutations
-    for stmt_type in ['for', 'if']:
-        print(f"\nProcessing {stmt_type.upper()} statement mutations:")
-        for mut in sorted(all_mutations['sdl'][stmt_type], 
-                         key=lambda x: (x['file'], x['function'], x['lineno'])):
-            mutation_id = mut['id']
-            print(f"\nTesting mutation: {mutation_id} in {mut['file']}")
-            result = run_single_mutation_test(args, mutation_id, pytest_args, working_dir)
-            results[mutation_id] = {
-                'passed': result == 0,
-                'file': mut['file'],
-                'function': mut['function'],
-                'type': 'sdl',
-                'statement_type': stmt_type,
-                'line': mut['lineno'],
-                'number': mut.get('number', 0)
-            }
+    # First, run all tests with coverage collecting enabled
+    coverage_data = collect_coverage_mapping(working_dir, pytest_args)
+    
+    if not coverage_data or not coverage_data.get('tests'):
+        logger.error("Failed to collect coverage data")
+        return {}
+    
+    logger.info(f"Found {len(coverage_data['tests'])} tests covering {len(coverage_data.get('mutants', []))} potential mutations")
+    
+    # Check if we have any mutants
+    if not coverage_data.get('mutants'):
+        logger.warning("No mutants were covered by tests")
+        results = {}
+    else:
+        # Group mutants by the tests that cover them
+        test_to_mutants = {}
+        for mutant_id, tests in coverage_data.get('mutant_coverage', {}).items():
+            for test in tests:
+                if test not in test_to_mutants:
+                    test_to_mutants[test] = []
+                test_to_mutants[test].append(mutant_id)
+        
+        # Run each test with its covered mutants
+        results = {}
+        for test, mutants in test_to_mutants.items():
+            if not mutants:
+                continue
+                
+            logger.info(f"Running test {test} with {len(mutants)} mutants")
+            
+            # Enable all mutants covered by this test
+            test_results = run_test_with_mutants(args, test, mutants, pytest_args, working_dir)
+            
+            # Add results to the overall results
+            for mutant_id, result in test_results.items():
+                if mutant_id not in results:
+                    results[mutant_id] = result
     
     # Generate report
     killed = sum(1 for r in results.values() if not r['passed'])
@@ -424,7 +568,7 @@ def run_all_mutations(args, pytest_args, working_dir=None):
         'mutations': results,
         'metadata': {
             'timestamp': datetime.datetime.now().isoformat(),
-            'target': str(target_path)
+            'target': str(args.project_path)
         }
     }
     
@@ -763,12 +907,11 @@ def main():
             if not working_dir.exists():
                 logger.error("No instrumented version found. Run --instrument first.")
                 return
-                
-            # Set environment variable for config path
-            os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
-            
+                    
+            logger.info("Running all mutations grouped by test coverage...")
             results = run_all_mutations(args, pytest_args, working_dir)
-            generate_mutation_report(results)
+            if results:
+                generate_mutation_report(results)
             return
 
     except Exception as e:

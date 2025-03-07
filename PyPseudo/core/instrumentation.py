@@ -403,11 +403,6 @@ def instrument_code_safe(source_code, plugin_name, mutants, module_name=None):
 def run_instrumentation(input_file, mutant_file, safe_mode=False):
     """
     Orchestrates the complete instrumentation process for a file.
-    
-    Args:
-        input_file: Path to the file to instrument
-        mutant_file: Path to the mutation configuration
-        safe_mode: Whether to use conservative instrumentation for complex projects
     """
     try:
         # Check if pypseudo_instrumentation is installed
@@ -425,9 +420,6 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Check for metaclass usage (for safe mode)
-        has_metaclass = "metaclass" in source_code or "ABCMeta" in source_code
-        
         # Get module name from file path
         module_name = Path(input_file).stem
         # Get the actual filename for module identification
@@ -452,37 +444,7 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
         )
 
         if is_test_file:
-            # Handle test files
-            # Parse the source code to get original imports
-            tree = ast.parse(source_code)
-            original_imports = []
-            seen_imports = set()
-            
-            for node in tree.body:
-                if isinstance(node, (ast.Import, ast.ImportFrom)):
-                    # Skip mutation-related imports
-                    if isinstance(node, ast.ImportFrom) and node.module in ['mutation_plugin', 'mutation_support', 'pypseudo_instrumentation']:
-                        continue
-                    
-                    import_str = astor.to_source(node).strip()
-                    if import_str not in seen_imports:
-                        original_imports.append(import_str)
-                        seen_imports.add(import_str)
-
-            # Remove all existing imports and fixtures
-            source_code = re.sub(
-                r'import\s+.*?\n|from\s+.*?import.*?\n',
-                '',
-                source_code,
-                flags=re.MULTILINE
-            )
-            source_code = re.sub(
-                r'@pytest\.fixture\s*\ndef plugin\(\).*?return plugin\s*\n',
-                '',
-                source_code,
-                flags=re.DOTALL
-            )
-
+            # For test files, simply add our fixture at the top and leave the rest intact
             # Create support code with package imports
             support_code = """import os
 import sys
@@ -502,14 +464,14 @@ def plugin():
     plugin = MutationPlugin(config_path)
     plugin.load_mutants()
     return plugin
+
 """
+            # Check if there's a preexisting plugin fixture that needs to be removed
+            fixture_pattern = r'@pytest\.fixture(?:\([^)]*\))?\s*\ndef\s+plugin\s*\([^)]*\):.*?(?:return|yield).*?plugin.*?\n'
+            source_code = re.sub(fixture_pattern, '', source_code, flags=re.DOTALL)
             
-            # Add original imports after the support code
-            if original_imports:
-                support_code += "\n" + "\n".join(sorted(original_imports)) + "\n"
-
-            source_code = support_code + '\n' + source_code.strip()
-
+            # Add our support code at the beginning and leave the rest untouched
+            source_code = support_code + source_code
         else:
             # For regular Python files
             # Add imports at the top
@@ -525,14 +487,8 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
             # Combine import header with original source
             source_code = import_header + source_code
             
-            # If we're in safe mode and the file uses metaclasses, use function-only instrumentation
-            if safe_mode and has_metaclass:
-                # Use a specialized instrumentation approach for metaclass-heavy code
-                mutated_code = instrument_code_safe(source_code, 'plugin', enabled_mutants, filename)
-            else:
-                # Use normal instrumentation
-                mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
-                
+            # Now instrument the code
+            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
             source_code = mutated_code
 
         with open(input_file, 'w') as f:

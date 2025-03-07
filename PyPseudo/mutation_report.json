@@ -1,0 +1,12 @@
+{
+    "summary": {
+        "total_mutations": 0,
+        "killed_mutations": 0,
+        "survived_mutations": 0
+    },
+    "mutations": {},
+    "metadata": {
+        "timestamp": "2025-03-07T13:09:02.977967",
+        "target": "../../../deepdiff"
+    }
+}

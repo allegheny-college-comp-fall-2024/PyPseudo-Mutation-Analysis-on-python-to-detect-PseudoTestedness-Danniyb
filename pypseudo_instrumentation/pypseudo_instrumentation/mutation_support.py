@@ -15,6 +15,28 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global coverage tracking
+_coverage_data = {'collecting': False, 'current_test': None}
+
+def start_coverage_collection():
+    """Enable coverage collection mode"""
+    _coverage_data['collecting'] = True
+    logger.debug("Coverage collection enabled")
+
+def set_current_test(test_id):
+    """Set the currently running test"""
+    _coverage_data['current_test'] = test_id
+    logger.debug(f"Current test set to: {test_id}")
+
+def register_coverage(mutant_id, test_id=None):
+    """
+    Register that a mutant was covered by the current test.
+    This function will be monkey-patched by the coverage collector.
+    """
+    test = test_id or _coverage_data['current_test']
+    logger.debug(f"Coverage registered: {mutant_id} covered by {test}")
+    # The real implementation will be injected by the MutationPlugin
+
 class MutationPlugin:
     """
     Plugin for controlling mutations in instrumented code.
@@ -100,6 +122,11 @@ class MutationPlugin:
         Returns:
             bool: True if the mutation should be enabled, False otherwise
         """
+        # If we're collecting coverage, register the mutant but don't enable it
+        if _coverage_data['collecting']:
+            register_coverage(mutant_id, _coverage_data['current_test'])
+            return False
+            
         if not self.config.get('enable_mutation', False):
             # Short-circuit if mutations are globally disabled
             logger.debug(f"Mutation check [{mutant_id}]: disabled globally")
@@ -226,6 +253,11 @@ def is_mutant_enabled(mutant_id):
     Returns:
         bool: True if the mutation should be enabled, False otherwise
     """
+    # If we're collecting coverage, register it
+    if _coverage_data['collecting']:
+        register_coverage(mutant_id, _coverage_data['current_test'])
+        return False
+        
     global _plugin
     if _plugin is None:
         config_file = find_config_file()
