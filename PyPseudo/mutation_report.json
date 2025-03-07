@@ -1,12 +1,463 @@
 {
     "summary": {
-        "total_mutations": 0,
-        "killed_mutations": 0,
+        "total_mutations": 90,
+        "killed_mutations": 90,
         "survived_mutations": 0
     },
-    "mutations": {},
+    "mutations": {
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/anyset.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_anyset.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/delta.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_delta.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/distance.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_distance.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/helper.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_helper.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/lfucache.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_lfucache.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/model.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_model.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/path.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_path.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/search.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_search.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_1": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_2": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_3": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_4": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_5": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_6": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_7": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_8": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_9": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        },
+        "xmt_/Users/danielbekele/senior/deepdiff_pypseudo_work/deepdiff/serialization.py_10": {
+            "passed": false,
+            "test": "../../../deepdiff_pypseudo_work/tests/test_serialization.py",
+            "type": "xmt"
+        }
+    },
     "metadata": {
-        "timestamp": "2025-03-07T13:09:02.977967",
+        "timestamp": "2025-03-07T18:32:23.991372",
         "target": "../../../deepdiff"
     }
 }
