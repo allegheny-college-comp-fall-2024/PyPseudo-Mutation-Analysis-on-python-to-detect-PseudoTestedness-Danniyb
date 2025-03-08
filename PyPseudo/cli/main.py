@@ -16,6 +16,7 @@ import subprocess
 import re
 import glob
 
+
 # Add parent directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -289,6 +290,10 @@ def collect_existing_mutants(working_dir):
         for test_file in test_files:
             test_to_mutants[test_file] = list(all_mutants)
     
+    # Remove duplicates in the lists
+    for test_file in test_to_mutants:
+        test_to_mutants[test_file] = list(set(test_to_mutants[test_file]))
+    
     return {
         'mutants': list(all_mutants),
         'test_to_mutants': test_to_mutants,
@@ -408,156 +413,204 @@ def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
         logger.error(f"Error running mutation {mutation_id}: {e}")
         return 1
 
-def collect_coverage_mapping(working_dir, pytest_args):
+def collect_coverage_mapping(working_dir, pytest_args=None):
     """
     Collect test coverage data to map tests to mutants.
+    
+    Args:
+        working_dir: Path to the instrumented project
+        pytest_args: Additional pytest arguments
     
     Returns:
         dict: Coverage mapping with tests, mutants, and their relationships
     """
     logger.info("Setting up Python path for coverage collection")
     
+    # Make sure working_dir is a Path object
+    if not isinstance(working_dir, Path):
+        working_dir = Path(working_dir)
+    
     # Add the working directory to Python path to resolve imports
-    sys.path.insert(0, str(working_dir))
+    working_dir_str = str(working_dir)
     
     try:
-        # Create a temporary mutant file that enables coverage collection
-        os.makedirs(working_dir / '.pypseudo', exist_ok=True)
-        temp_mutant_file = working_dir / '.pypseudo' / 'coverage_mutants.json'
-        coverage_config = {
-            "enable_mutation": False,  # Initially disable mutations
-            "collect_coverage": True,  # Special flag for coverage collection
-            "enabled_mutants": []
-        }
-        
-        with open(temp_mutant_file, 'w') as f:
-            json.dump(coverage_config, f, indent=2)
-        
-        # Set environment variable to use our coverage config
-        os.environ['PYPSEUDO_CONFIG_FILE'] = str(temp_mutant_file)
-        
-        # Use a simpler approach - run pytest with coverage plugin
-        try:
-            # Try to get test coverage using pytest-cov
-            logger.info("Collecting coverage information using pytest-cov")
+        # Create a temporary directory for coverage files
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            # Run pytest with coverage to get data
+            coverage_args = []
+            if pytest_args:
+                coverage_args.extend(pytest_args)
             
-            # Create a temporary directory for coverage files
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                # Run pytest with coverage to get data
-                cov_args = list(pytest_args) + [
-                    f"--cov={working_dir}", 
-                    f"--cov-report=json:{tmpdirname}/coverage.json"
-                ]
+            # Add coverage arguments
+            coverage_args.extend([
+                f"--cov={working_dir_str}", 
+                f"--cov-report=json:{tmpdirname}/coverage.json"
+            ])
+            
+            logger.info(f"Running tests with coverage: pytest {' '.join(coverage_args)}")
+            
+            # Run pytest with coverage
+            try:
+                test_env = os.environ.copy()
+                test_env['PYTHONPATH'] = working_dir_str + os.pathsep + test_env.get('PYTHONPATH', '')
                 
-                pytest.main(cov_args)
+                process = subprocess.run(
+                    ["python", "-m", "pytest"] + coverage_args,
+                    cwd=working_dir,
+                    capture_output=True,
+                    text=True,
+                    env=test_env
+                )
                 
-                # Check if coverage file was created
+                logger.debug(f"Coverage command return code: {process.returncode}")
+                logger.debug(f"Coverage command stdout: {process.stdout}")
+                if process.stderr:
+                    logger.debug(f"Coverage command stderr: {process.stderr}")
+            except Exception as e:
+                logger.error(f"Error running pytest with coverage: {e}")
+            
+            # Check if coverage file was created
+            try:
+                with open(f"{tmpdirname}/coverage.json", 'r') as f:
+                    coverage_data = json.load(f)
+                    logger.info("Successfully loaded coverage data")
+            except FileNotFoundError:
+                logger.warning("Coverage file not found. Falling back to simple mapping.")
+                coverage_data = None
+            
+            # Pattern to match mutation IDs in code
+            mutant_pattern = re.compile(r"is_mutant_enabled\(['\"](xmt_[^'\"]+|sdl_[^'\"]+)['\"]")
+            
+            # Find all mutants in the code
+            all_mutants = set()
+            file_to_mutants = {}
+            
+            for py_file in working_dir.glob("**/*.py"):
+                if py_file.name.startswith('__pycache__') or '.pypseudo' in str(py_file):
+                    continue
+                    
                 try:
-                    with open(f"{tmpdirname}/coverage.json", 'r') as f:
-                        coverage_data = json.load(f)
-                except FileNotFoundError:
-                    logger.warning("Coverage file not found. Falling back to directory mapping.")
-                    coverage_data = None
-                
-                # Map test files to source files based on coverage data
-                test_to_source = {}
-                source_to_test = {}
-                
-                if coverage_data:
-                    # Process the coverage data to map tests to source files
-                    for file_path, file_data in coverage_data.get('files', {}).items():
-                        # Skip non-python files and test files
-                        if not file_path.endswith('.py') or 'test_' in file_path:
-                            continue
+                    with open(py_file, 'r') as f:
+                        content = f.read()
                         
-                        # For each source file, find corresponding test files
-                        module_name = os.path.basename(file_path).replace('.py', '')
-                        for test_file in working_dir.glob(f"**/test_{module_name}.py"):
-                            test_id = str(test_file)
-                            if test_id not in test_to_source:
-                                test_to_source[test_id] = []
-                            test_to_source[test_id].append(file_path)
-                            
-                            if file_path not in source_to_test:
-                                source_to_test[file_path] = []
-                            source_to_test[file_path].append(test_id)
-                else:
-                    # Fallback to simple name-based mapping
-                    logger.info("Using simple name-based mapping for coverage")
-                    for test_file in working_dir.glob("**/test_*.py"):
-                        test_id = str(test_file)
-                        module_name = test_file.stem.replace("test_", "")
-                        
-                        # Find corresponding source files by name
-                        for source_file in working_dir.glob(f"**/{module_name}.py"):
-                            if source_file.is_file():
-                                if test_id not in test_to_source:
-                                    test_to_source[test_id] = []
-                                test_to_source[test_id].append(str(source_file))
-                                
-                                if str(source_file) not in source_to_test:
-                                    source_to_test[str(source_file)] = []
-                                source_to_test[str(source_file)].append(test_id)
+                        # Find all mutant IDs in this file
+                        matches = mutant_pattern.findall(content)
+                        if matches:
+                            file_to_mutants[str(py_file)] = list(set(matches))
+                            all_mutants.update(matches)
+                except Exception as e:
+                    logger.debug(f"Error reading {py_file}: {e}")
+            
+            # Find test files
+            test_files = []
+            for py_file in working_dir.glob("**/*.py"):
+                if py_file.name.startswith('test_') and py_file.name.endswith('.py'):
+                    test_files.append(str(py_file))
+            
+            # Map test files to mutants based on coverage
+            test_to_mutants = {}
+            
+            if coverage_data and 'files' in coverage_data:
+                logger.info("Using coverage data to map tests to modules")
                 
-                # Generate synthetic mutant IDs for each source file
-                mutant_coverage = {}
-                test_coverage = {}
-                all_mutants = []
-                
-                for source_file, tests in source_to_test.items():
-                    # Generate up to 10 synthetic mutants per file
-                    for i in range(1, 11):
-                        mutant_id = f"xmt_{source_file}_{i}"
-                        all_mutants.append(mutant_id)
+                # For each source file, find which test files cover it
+                for file_path, file_data in coverage_data['files'].items():
+                    # Skip non-python files and test files
+                    if not file_path.endswith('.py') or 'test_' in file_path:
+                        continue
                         
-                        mutant_coverage[mutant_id] = tests
+                    # Get mutants for this file
+                    mutants = file_to_mutants.get(file_path, [])
+                    if not mutants:
+                        continue
+                    
+                    # Get the list of tests that cover this file
+                    if 'contexts' in file_data and file_data['contexts']:
+                        for context in file_data['contexts']:
+                            test_id = context.get('test_id')
+                            if test_id:
+                                # Find the test file from the test_id
+                                for test_file in test_files:
+                                    if test_id.startswith(test_file):
+                                        if test_file not in test_to_mutants:
+                                            test_to_mutants[test_file] = []
+                                        test_to_mutants[test_file].extend(mutants)
+            
+            # If we couldn't get coverage data or no mapping was found, use a simple approach
+            if not test_to_mutants:
+                logger.info("Using simple name-based mapping for coverage")
+                for test_file in test_files:
+                    # Get the module name from the test file name
+                    test_module = os.path.basename(test_file).replace('test_', '').replace('.py', '')
+                    
+                    # Find source files that might be tested by this test file
+                    for source_file, mutants in file_to_mutants.items():
+                        source_module = os.path.basename(source_file).replace('.py', '')
                         
-                        for test in tests:
-                            if test not in test_coverage:
-                                test_coverage[test] = []
-                            test_coverage[test].append(mutant_id)
-                
-                # Save the coverage mapping
-                mapping = {
-                    'tests': list(test_coverage.keys()),
-                    'mutants': all_mutants,
-                    'test_coverage': test_coverage,
-                    'mutant_coverage': mutant_coverage,
-                    'metadata': {
-                        'timestamp': datetime.datetime.now().isoformat(),
-                        'source': 'directory-based mapping'
-                    }
+                        # If the module names match or the test module is in the source module name
+                        if source_module == test_module or test_module in source_module:
+                            if test_file not in test_to_mutants:
+                                test_to_mutants[test_file] = []
+                            test_to_mutants[test_file].extend(mutants)
+            
+            # If still no mapping, use all mutants for all tests
+            if not test_to_mutants:
+                logger.info("No specific mapping found. Using all tests for all mutants.")
+                for test_file in test_files:
+                    test_to_mutants[test_file] = list(all_mutants)
+            
+            # Remove duplicates in the lists
+            for test_file in test_to_mutants:
+                test_to_mutants[test_file] = list(set(test_to_mutants[test_file]))
+            
+            # Create the reverse mapping (mutant -> tests)
+            mutant_to_tests = {}
+            for test_file, mutants in test_to_mutants.items():
+                for mutant in mutants:
+                    if mutant not in mutant_to_tests:
+                        mutant_to_tests[mutant] = []
+                    mutant_to_tests[mutant].append(test_file)
+            
+            # Create the final mapping
+            mapping = {
+                'tests': list(test_to_mutants.keys()),
+                'mutants': list(all_mutants),
+                'test_to_mutants': test_to_mutants,
+                'mutant_to_tests': mutant_to_tests,
+                'metadata': {
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'source': 'coverage-based mapping' if coverage_data else 'name-based mapping'
                 }
-                
-                with open(working_dir / '.pypseudo' / 'coverage_data.json', 'w') as f:
+            }
+            
+            # Save the mapping for future use
+            try:
+                os.makedirs(working_dir / '.pypseudo', exist_ok=True)
+                with open(working_dir / '.pypseudo' / 'coverage_mapping.json', 'w') as f:
                     json.dump(mapping, f, indent=2)
-                
-                logger.info(f"Generated coverage mapping with {len(mapping['tests'])} tests and {len(mapping['mutants'])} potential mutants")
-                return mapping
-        except ImportError:
-            logger.warning("pytest-cov not available. Using directory-based mapping.")
-        
-        # If pytest-cov approach failed, use directory-based mapping
-        mapping = collect_existing_mutants(working_dir)
-        
-        return mapping
+            except Exception as e:
+                logger.error(f"Error saving coverage mapping: {e}")
+            
+            logger.info(f"Generated coverage mapping with {len(mapping['tests'])} tests and {len(mapping['mutants'])} mutants")
+            return mapping
+            
     except Exception as e:
         logger.error(f"Error collecting coverage: {str(e)}")
         # Return a minimal valid mapping structure
         return {
             'tests': [],
             'mutants': [],
-            'test_coverage': {},
-            'mutant_coverage': {}
+            'test_to_mutants': {},
+            'mutant_to_tests': {}
         }
-
-def run_test_with_mutants(args, test_id, mutant_ids, pytest_args, working_dir):
+    
+def run_test_with_mutants(args, test_file, mutant_ids, pytest_args, working_dir):
     """
     Run a specific test with multiple mutants enabled.
     
     Args:
         args: Command line arguments
-        test_id: ID of the test to run
+        test_file: Path to the test file
         mutant_ids: List of mutant IDs to enable
         pytest_args: Additional pytest arguments
         working_dir: Path to the instrumented project
@@ -565,120 +618,146 @@ def run_test_with_mutants(args, test_id, mutant_ids, pytest_args, working_dir):
     Returns:
         dict: Results for each mutant
     """
+    # Get the filename without path for logging
+    test_filename = os.path.basename(test_file)
     
-    # Create mutant config with all specified mutants enabled
-    mutants_config = {
-        'enable_mutation': True,
+    # Make sure working_dir is a Path object
+    working_dir = Path(working_dir)
+    
+    # Setup logging
+    logger.info(f"Testing {test_filename} with {len(mutant_ids)} mutants")
+    logger.info(f"Working directory: {working_dir}")
+    
+    # Function to run a test with the same approach as run_single_mutation_test
+    def run_test(mutant_config, label):
+        try:
+            # Write to mutant file
+            mutant_file_path = working_dir / '.pypseudo' / 'mutants.json'
+            os.makedirs(os.path.dirname(mutant_file_path), exist_ok=True)
+            with open(mutant_file_path, 'w') as f:
+                json.dump(mutant_config, f, indent=4)
+            
+            # Set environment variable
+            os.environ['PYPSEUDO_CONFIG_FILE'] = str(mutant_file_path)
+            
+            # Display config for debugging
+            logger.debug(f"{label} config: {json.dumps(mutant_config, indent=2)}")
+            
+            # Instead of running a specific test file, just run all tests
+            # This matches what --single-mutant does
+            # Use os.system to exactly match the approach used in --run
+            cmd = "cd " + str(working_dir) + " && python -m pytest"
+            if pytest_args:
+                cmd += " " + " ".join(pytest_args)
+            
+            logger.debug(f"Running command: {cmd}")
+            
+            # Run the test with the same approach used in run_tests
+            return_code = os.system(cmd)
+            passed = return_code == 0
+            
+            return passed, "", ""  # We don't capture stdout/stderr with os.system
+        except Exception as e:
+            logger.error(f"Error running {label} test: {str(e)}")
+            return False, "", str(e)
+    
+    # Create baseline config with no mutations enabled
+    baseline_config = {
+        'enable_mutation': False,
         'enabled_mutants': []
     }
     
-    # Group mutants by type (xmt or sdl)
-    xmt_mutants = [m for m in mutant_ids if m.startswith('xmt_')]
-    sdl_mutants = [m for m in mutant_ids if m.startswith('sdl_')]
+    # Run baseline test
+    logger.info(f"Running baseline test for {test_filename}")
+    baseline_passed, _, _ = run_test(baseline_config, "Baseline")
     
-    # Add all mutants to config
-    for mutant_id in xmt_mutants:
-        mutants_config['enabled_mutants'].append({
-            'type': 'xmt',
-            'target': mutant_id
-        })
-    
-    for mutant_id in sdl_mutants:
-        # Extract statement type from mutant ID (e.g., 'for' from 'sdl_for_123')
-        parts = mutant_id.split('_')
-        if len(parts) > 1:
-            stmt_type = parts[1]
-            mutants_config['enabled_mutants'].append({
-                'type': 'sdl',
-                'target': [stmt_type]
-            })
-    
-    # Write to mutant file
-    os.makedirs(os.path.dirname(working_dir / '.pypseudo' / 'mutants.json'), exist_ok=True)
-    with open(working_dir / '.pypseudo' / 'mutants.json', 'w') as f:
-        json.dump(mutants_config, f, indent=4)
-    
-    # Set environment variable
-    os.environ['PYPSEUDO_CONFIG_FILE'] = str(working_dir / '.pypseudo' / 'mutants.json')
-    
-    # Extract just the filename from the test_id path for running the test
-    test_filename = os.path.basename(test_id)
-    
-    # Build the test command - include verbose flag to see individual test names
-    test_args = list(pytest_args) + [test_filename, "-v"]
-    
-    # Run the test and capture output
-    try:
-        logger.info(f"Running test {test_filename} with {len(mutant_ids)} mutants")
-        process = subprocess.run(
-            ["pytest"] + test_args,
-            cwd=working_dir,
-            capture_output=True,
-            text=True,
-            timeout=60  # Add a timeout to prevent hanging
-        )
+    if not baseline_passed:
+        logger.warning(f"Baseline test failed for {test_filename}")
         
-        # Attempt to identify individual test cases using regex pattern
-        test_cases = []
-        try:
-            # This regex pattern looks for test names in pytest verbose output
-            pattern = re.compile(r'::(\w+)(\[.*?\])?\s')
-            for line in process.stdout.split('\n'):
-                match = pattern.search(line)
-                if match and test_filename in line:
-                    test_case = match.group(1)
-                    test_cases.append(test_case)
-            
-            # Remove duplicates while preserving order
-            test_cases = list(dict.fromkeys(test_cases))
-        except Exception as e:
-            logger.warning(f"Error extracting test cases: {str(e)}")
-            # Fall back to using the full test file if we can't extract test cases
-            test_cases = []
+        # Return results where we can't determine the status
+        results = {}
+        for mutant_id in mutant_ids:
+            results[mutant_id] = {
+                'passed': None,  # None means we couldn't determine
+                'test': {
+                    'file': test_filename,
+                    'test_cases': []
+                },
+                'type': 'xmt' if mutant_id.startswith('xmt_') else 'sdl',
+                'error': "Baseline test failed"
+            }
+        return results
         
-        # Use test case info if available
-        test_info = {
-            'file': test_filename,
-            'test_cases': test_cases
+    logger.info(f"Baseline test passed for {test_filename}, now running with mutations")
+    
+    # Now run each mutant individually
+    results = {}
+    for mutant_id in mutant_ids:
+        # Create mutant config with just this mutant enabled
+        mut_type = 'xmt' if mutant_id.startswith('xmt_') else 'sdl'
+        
+        if mut_type == 'xmt':
+            mutant_config = {
+                'enable_mutation': True,
+                'enabled_mutants': [{
+                    'type': 'xmt',
+                    'target': mutant_id
+                }]
+            }
+        else:  # SDL
+            parts = mutant_id.split('_')
+            if len(parts) > 1:
+                stmt_type = parts[1]
+                mutant_config = {
+                    'enable_mutation': True,
+                    'enabled_mutants': [{
+                        'type': 'sdl',
+                        'target': [stmt_type]
+                    }]
+                }
+            else:
+                logger.warning(f"Skipping invalid mutant ID: {mutant_id}")
+                continue
+        
+        logger.info(f"Running test with mutant {mutant_id}")
+        
+        # Run test with the mutant
+        mutant_passed, _, _ = run_test(mutant_config, f"Mutant {mutant_id}")
+        
+        # In mutation testing, a SURVIVED mutant is one where tests PASS despite the mutation
+        # This indicates pseudo-tested code
+        results[mutant_id] = {
+            'passed': mutant_passed,  # If tests pass, the mutant survived
+            'test': {
+                'file': test_filename,
+                'test_cases': []  # We'll fill this later
+            },
+            'type': mut_type
         }
+    
+    # After running all mutants, try to extract test case names from a successful run
+    try:
+        # Run pytest with --collect-only to get test names
+        cmd = f"cd {working_dir} && python -m pytest --collect-only -v {test_file}"
+        process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         
-        # Check if the test passed
-        test_passed = process.returncode == 0
+        # Extract test case names from output
+        test_cases = []
+        pattern = re.compile(r'::(\w+)(\[.*?\])?\s')
+        for line in process.stdout.split('\n'):
+            match = pattern.search(line)
+            if match and test_filename in line:
+                test_case = match.group(1)
+                test_cases.append(test_case)
         
-        # Process results for each mutant - if test passes, mutant survived
-        results = {}
-        for mutant_id in mutant_ids:
-            results[mutant_id] = {
-                'passed': test_passed,  # If tests pass, the mutant survived
-                'test': test_info,
-                'type': 'xmt' if mutant_id.startswith('xmt_') else 'sdl'
-            }
-        
-        return results
-    except subprocess.TimeoutExpired:
-        logger.warning(f"Test {test_filename} timed out")
-        # If test times out, consider it failed (mutant killed)
-        results = {}
-        for mutant_id in mutant_ids:
-            results[mutant_id] = {
-                'passed': False,  # Timeout means test failed, mutant killed
-                'test': {'file': test_filename, 'test_cases': []},
-                'type': 'xmt' if mutant_id.startswith('xmt_') else 'sdl',
-                'timeout': True
-            }
-        return results
+        # Add test case names to all results
+        for result in results.values():
+            result['test']['test_cases'] = test_cases
+            
     except Exception as e:
-        logger.error(f"Error running test {test_filename}: {str(e)}")
-        # If there's an error, consider it failed (mutant killed)
-        results = {}
-        for mutant_id in mutant_ids:
-            results[mutant_id] = {
-                'passed': False,  # Error means test failed, mutant killed
-                'test': {'file': test_filename, 'test_cases': []},
-                'type': 'xmt' if mutant_id.startswith('xmt_') else 'sdl',
-                'error': str(e)
-            }
-        return results
+        logger.warning(f"Error extracting test cases: {str(e)}")
+    
+    return results
 
 
 def run_all_mutations(args, pytest_args, working_dir=None):
@@ -686,45 +765,205 @@ def run_all_mutations(args, pytest_args, working_dir=None):
     Run tests with mutations grouped by test coverage.
     This is more efficient than running each mutation separately.
     """
-    logger.info("Collecting existing mutants from instrumented code...")
+    import os
+    import json
+    import datetime
+    import subprocess
+    import sys
+    import re
+    from pathlib import Path
     
-    # Collect existing mutants
-    coverage_data = collect_existing_mutants(working_dir)
+    # Ensure working_dir is a Path object
+    if working_dir is not None and not isinstance(working_dir, Path):
+        working_dir = Path(working_dir)
     
-    if not coverage_data or not coverage_data.get('mutants'):
-        logger.error("No mutants found in the instrumented code")
-        return {}
+    logger.info(f"Running all mutations for project: {args.project_path}")
+    logger.info(f"Working directory: {working_dir}")
     
-    logger.info(f"Found {len(coverage_data['mutants'])} mutants in the instrumented code")
+    # Get list of mutants from the instrumented code
+    all_mutants = []
     
-    # Create a mapping of tests to mutants
-    test_to_mutants = coverage_data.get('test_to_mutants', {})
+    # Pattern to match mutation IDs in code
+    pattern = re.compile(r"is_mutant_enabled\(['\"](xmt_[^'\"]+|sdl_[^'\"]+)['\"]")
     
-    # Run each test with its associated mutants
-    results = {}
-    for test_file, mutants in test_to_mutants.items():
-        if not mutants:
-            continue
+    # Search through all Python files
+    for root, dirs, files in os.walk(working_dir):
+        for file in files:
+            if file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, 'r') as f:
+                        content = f.read()
+                        matches = pattern.findall(content)
+                        all_mutants.extend(matches)
+                except:
+                    pass
+    
+    # Remove duplicates
+    all_mutants = list(set(all_mutants))
+    
+    logger.info(f"Found {len(all_mutants)} mutants in the instrumented code")
+    
+    # Function to run a single mutant test
+    def run_single_mutant_test(mutant_id):
+        """Run a single mutation test"""
+        # Determine mutant type
+        mut_type = 'xmt' if mutant_id.startswith('xmt_') else 'sdl'
+        
+        # Create the mutant configuration
+        if mut_type == 'xmt':
+            mutants_config = {
+                'enable_mutation': True,
+                'enabled_mutants': [{
+                    'type': 'xmt',
+                    'target': mutant_id
+                }]
+            }
+        else:  # SDL
+            parts = mutant_id.split('_')
+            if len(parts) > 1:
+                stmt_type = parts[1]
+                mutants_config = {
+                    'enable_mutation': True,
+                    'enabled_mutants': [{
+                        'type': 'sdl',
+                        'target': [stmt_type]
+                    }]
+                }
+            else:
+                logger.warning(f"Invalid mutant ID format: {mutant_id}")
+                return None
+        
+        # Write the mutant configuration
+        with open(args.mutant_file, 'w') as f:
+            json.dump(mutants_config, f, indent=4)
             
-        logger.info(f"Running test {os.path.basename(test_file)} with {len(set(mutants))} mutants")
+        # Set environment variable for config path
+        if working_dir:
+            config_path = str(working_dir / '.pypseudo' / 'mutants.json')
+            os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+            
+            # Copy the config to the working directory
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w') as f:
+                json.dump(mutants_config, f, indent=4)
         
-        # Enable all mutants covered by this test
-        test_results = run_test_with_mutants(args, test_file, list(set(mutants)), pytest_args, working_dir)
+        # Run pytest directly to match the approach in --run
+        test_results = {}
         
-        # Add results to the overall results
-        for mutant_id, result in test_results.items():
-            if mutant_id not in results:
-                results[mutant_id] = result
+        logger.info(f"Running tests with mutant {mutant_id}")
+        
+        # First, run all the tests once to see which ones pass and fail
+        cmd = f"cd {working_dir} && python -m pytest -v"
+        process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        # Extract test results from the output
+        test_cases = []
+        failed_tests = []
+        passed_tests = []
+        
+        # Parse pytest output to identify which tests passed/failed
+        for line in process.stdout.split('\n'):
+            if 'PASSED' in line or 'FAILED' in line:
+                test_match = re.search(r'(test_[^:]+)::(test_\w+)', line)
+                if test_match:
+                    test_file = test_match.group(1)
+                    test_case = test_match.group(2)
+                    test_cases.append(test_case)
+                    
+                    if 'PASSED' in line:
+                        passed_tests.append(test_case)
+                    else:
+                        failed_tests.append(test_case)
+        
+        # Analyze the results
+        mutant_passed = (process.returncode == 0)
+        
+        # Determine if the mutant was killed or survived
+        result = {
+            'passed': mutant_passed,  # True if tests passed (mutant survived)
+            'test': {
+                'file': '',  # We don't track by file here
+                'test_cases': test_cases,
+                'passed_tests': passed_tests,
+                'failed_tests': failed_tests
+            },
+            'type': mut_type
+        }
+        
+        return result
     
-    # Generate report
-    killed = sum(1 for r in results.values() if not r['passed'])
-    survived = sum(1 for r in results.values() if r['passed'])
+    # First, run without any mutations to establish baseline
+    logger.info("Running baseline test without mutations")
+    
+    # Create baseline config with no mutations enabled
+    baseline_config = {
+        'enable_mutation': False,
+        'enabled_mutants': []
+    }
+    
+    # Write baseline config
+    with open(args.mutant_file, 'w') as f:
+        json.dump(baseline_config, f, indent=4)
+        
+    # Copy to working directory
+    config_path = str(working_dir / '.pypseudo' / 'mutants.json')
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, 'w') as f:
+        json.dump(baseline_config, f, indent=4)
+    
+    # Set environment variable for config path
+    os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+    
+    # Run baseline tests
+    cmd = f"cd {working_dir} && python -m pytest -v"
+    baseline_process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    
+    # Parse baseline results
+    baseline_test_results = {}
+    for line in baseline_process.stdout.split('\n'):
+        if 'PASSED' in line or 'FAILED' in line:
+            test_match = re.search(r'(test_[^:]+)::(test_\w+)', line)
+            if test_match:
+                test_file = test_match.group(1)
+                test_case = test_match.group(2)
+                baseline_test_results[test_case] = 'PASSED' in line
+    
+    logger.info(f"Baseline test completed with {sum(1 for r in baseline_test_results.values() if r)} passed tests")
+    
+    # Now run each mutant individually
+    results = {}
+    for mutant_id in all_mutants:
+        logger.info(f"Testing mutant {mutant_id}")
+        mutant_result = run_single_mutant_test(mutant_id)
+        if mutant_result:
+            results[mutant_id] = mutant_result
+    
+    # Process results to determine if mutants were killed or survived
+    for mutant_id, result in results.items():
+        # Compare test results with baseline
+        mutant_passed_tests = set(result['test']['passed_tests'])
+        baseline_passed_tests = {t for t, p in baseline_test_results.items() if p}
+        
+        # If any test that passed in the baseline now fails, the mutant was killed
+        was_killed = baseline_passed_tests - mutant_passed_tests
+        if was_killed:
+            result['passed'] = False  # Mutant killed (test failed)
+            result['killed_by'] = list(was_killed)
+        else:
+            result['passed'] = True   # Mutant survived (all tests passed)
+    
+    # Count killed and survived mutations
+    killed = sum(1 for r in results.values() if r.get('passed') is False)
+    survived = sum(1 for r in results.values() if r.get('passed') is True)
+    unknown = sum(1 for r in results.values() if r.get('passed') is None)
     
     report = {
         'summary': {
             'total_mutations': len(results),
             'killed_mutations': killed,
-            'survived_mutations': survived
+            'survived_mutations': survived,
+            'unknown_mutations': unknown
         },
         'mutations': results,
         'metadata': {
@@ -744,9 +983,56 @@ def run_all_mutations(args, pytest_args, working_dir=None):
     print(f"Total Mutations: {len(results)}")
     print(f"Killed Mutations: {killed}")
     print(f"Survived Mutations: {survived}")
+    if unknown > 0:
+        print(f"Unknown Mutations: {unknown} (due to baseline test failures)")
+    
+    # Print pseudo-tested code information
+    if survived > 0:
+        print("\nPseudo-tested code detected!")
+        print("The following mutants survived (code is pseudo-tested):")
+        for mutant_id, result in results.items():
+            if result.get('passed') is True:
+                print(f"  - {mutant_id}")
+    
     print(f"\nDetailed results written to {report_path}")
     
     return results
+
+def setup_logging(verbose=False):
+    """
+    Set up logging configuration.
+    
+    Args:
+        verbose: Whether to enable debug logging
+    """
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG if verbose else logging.INFO)
+    
+    # Clear existing handlers to avoid duplicate messages
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Console handler for standard output
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+    
+    # Create a formatter with timestamp
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    
+    # Add handlers to the root logger
+    root_logger.addHandler(console_handler)
+    
+    # Create a file handler for debug logs
+    file_handler = logging.FileHandler('pypseudo.log', mode='w')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+    
+    # Return the logger for convenience
+    return root_logger
+
 
 def generate_mutation_report(results):
     """Generate a detailed report of mutation testing results"""
@@ -957,8 +1243,12 @@ def main():
     parser.add_argument('--json-report-file', help='Path to save the JSON report')
     parser.add_argument('--cov', help='Module or directory to measure coverage for')
     parser.add_argument('--cov-report', help='Coverage report format (e.g., json, term, etc.)')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose debug output')
 
     args = parser.parse_args()
+
+    # Set up logging
+    logger = setup_logging(args.verbose)
 
     # Check if pypseudo_instrumentation is installed
     try:
@@ -1041,17 +1331,7 @@ def main():
                     
             logger.info("Running all mutations grouped by test coverage...")
             results = run_all_mutations(args, pytest_args, working_dir)
-            if results:
-                # Generate the report from results
-                killed = sum(1 for r in results.values() if not r['passed'])
-                survived = sum(1 for r in results.values() if r['passed'])
-                
-                print("\nMutation Testing Report")
-                print("-" * 50)
-                print(f"Total Mutations: {len(results)}")
-                print(f"Killed Mutations: {killed}")
-                print(f"Survived Mutations: {survived}")
-                print(f"\nDetailed results written to mutation_report.json")
+            # Analysis and reporting are handled in run_all_mutations
             return
 
     except Exception as e:
