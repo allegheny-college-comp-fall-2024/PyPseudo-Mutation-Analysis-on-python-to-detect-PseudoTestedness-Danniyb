@@ -315,40 +315,31 @@ def get_target_files(path):
 def list_available_mutations(args):
     """Lists all mutations currently present in the code."""
     # Determine target path
-    target_path = args.project_path if args.project_path else 'simplePro/newtest.py'
+    original_path = Path(args.project_path)
     
-    # Get list of files to analyze
-    files_to_analyze = get_target_files(target_path)
+    # Check if there's an instrumented version
+    instrumented_path = original_path.parent / f"{original_path.name}_pypseudo_work"
+    if not instrumented_path.exists():
+        logger.error(f"No instrumented version found at {instrumented_path}. Run --instrument first.")
+        return {}
+        
+    # Use the collect_existing_mutants function to scan the instrumented code
+    logger.info(f"Scanning for mutations in {instrumented_path}")
+    coverage_data = collect_existing_mutants(instrumented_path)
     
-    # Initialize combined mutations dict
-    combined_mutations = {
-        'xmt': [],
-        'sdl': {
-            'for': [],
-            'if': []
-        }
-    }
+    # Group mutations by type
+    xmt_mutations = []
+    sdl_mutations = {'for': [], 'if': [], 'while': [], 'return': [], 'try': []}
     
-    # Analyze each file
-    for file_path in files_to_analyze:
-        if '.pypseudo' not in str(file_path):  # Skip support files
-            try:
-                file_mutations = analyze_code_for_mutations(file_path)
-                # Add file path to mutation info
-                for mut in file_mutations['xmt']:
-                    mut['file'] = str(file_path)
-                for mut in file_mutations['sdl']['for']:
-                    mut['file'] = str(file_path)
-                for mut in file_mutations['sdl']['if']:
-                    mut['file'] = str(file_path)
-                
-                # Combine mutations
-                combined_mutations['xmt'].extend(file_mutations['xmt'])
-                combined_mutations['sdl']['for'].extend(file_mutations['sdl']['for'])
-                combined_mutations['sdl']['if'].extend(file_mutations['sdl']['if'])
-            except Exception as e:
-                logger.error(f"Error analyzing {file_path}: {e}")
-                continue
+    for mutant_id in coverage_data.get('mutants', []):
+        if mutant_id.startswith('xmt_'):
+            xmt_mutations.append({'id': mutant_id})
+        elif mutant_id.startswith('sdl_'):
+            parts = mutant_id.split('_')
+            if len(parts) > 1:
+                stmt_type = parts[1]
+                if stmt_type in sdl_mutations:
+                    sdl_mutations[stmt_type].append({'id': mutant_id})
     
     # Display results
     print("\nAvailable Mutations:")
@@ -356,36 +347,28 @@ def list_available_mutations(args):
     
     # Display XMT mutations
     print("\nXMT Mutations (Function Level):")
-    if combined_mutations['xmt']:
-        sorted_xmt = sorted(combined_mutations['xmt'], 
-                          key=lambda x: (x['file'], x['function'], x.get('number', 0)))
-        for mut in sorted_xmt:
-            print(f"  - {mut['id']} in {mut['function']} ({mut['file']})")
+    if xmt_mutations:
+        for mut in xmt_mutations:
+            print(f"  - {mut['id']}")
     else:
         print("  None found")
     
     # Display SDL mutations
     print("\nSDL Mutations (Statement Level):")
     
-    # For loop mutations
-    print("\n  FOR Statements:")
-    if combined_mutations['sdl']['for']:
-        sorted_for = sorted(combined_mutations['sdl']['for'], 
-                          key=lambda x: (x['file'], x['function'], x['lineno']))
-        for mut in sorted_for:
-            print(f"    - {mut['id']} in {mut['function']} at line {mut['lineno']} ({mut['file']})")
-    else:
-        print("    None found")
-    
-    # If statement mutations
-    print("\n  IF Statements:")
-    if combined_mutations['sdl']['if']:
-        sorted_if = sorted(combined_mutations['sdl']['if'], 
-                         key=lambda x: (x['file'], x['function'], x['lineno']))
-        for mut in sorted_if:
-            print(f"    - {mut['id']} in {mut['function']} at line {mut['lineno']} ({mut['file']})")
-    else:
-        print("    None found")
+    for stmt_type, mutations in sdl_mutations.items():
+        print(f"\n  {stmt_type.upper()} Statements:")
+        if mutations:
+            for mut in mutations:
+                print(f"    - {mut['id']}")
+        else:
+            print("    None found")
+            
+    # Create a structure similar to the original return value
+    combined_mutations = {
+        'xmt': xmt_mutations,
+        'sdl': sdl_mutations
+    }
         
     return combined_mutations
 
