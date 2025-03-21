@@ -1,9 +1,21 @@
 import os
 import shutil
 import logging
+import tomli
+from pathlib import Path
+import json
+
+logger = logging.getLogger(__name__)
+
+import os
+import shutil
+import logging
 import importlib.util
 from pathlib import Path
 import json
+import tomli  # For parsing TOML files
+import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +26,7 @@ def setup_project_environment(project_path):
     Args:
         project_path: Path to target project
     Returns:
-        tuple: (working_dir, backup_path)
+        Path: working_dir
     """
     project_path = Path(project_path)
     if not project_path.exists():
@@ -28,17 +40,6 @@ def setup_project_environment(project_path):
     pypseudo_dir = working_dir / '.pypseudo'
     pypseudo_dir.mkdir(exist_ok=True)
     
-    # Create __init__.py files in key directories
-    for dir_path in [working_dir, working_dir / 'src', working_dir / 'tests']:
-        dir_path.mkdir(exist_ok=True)
-        init_file = dir_path / '__init__.py'
-        if not init_file.exists():
-            init_file.touch()
-
-    # Copy mutation support files
-    with open(pypseudo_dir / '__init__.py', 'w') as f:
-        f.write('')  # Empty __init__.py to make it a package
-    
     # Copy project files maintaining directory structure
     for item in project_path.glob("**/*"):
         if item.is_file() and not item.name.startswith('__pycache__'):
@@ -46,8 +47,101 @@ def setup_project_environment(project_path):
             target_path = working_dir / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(item, target_path)
+    
+    # Handle dependencies
+    install_project_dependencies(working_dir)
             
     return working_dir
+
+def install_project_dependencies(project_dir):
+    """
+    Install dependencies for the target project.
+    
+    Args:
+        project_dir: Path to the working directory of the project
+    """
+    project_dir = Path(project_dir)
+    
+    # Check for pyproject.toml first (Poetry)
+    pyproject_path = project_dir / "pyproject.toml"
+    requirements_path = project_dir / "requirements.txt"
+    
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, "rb") as f:
+                pyproject_data = tomli.load(f)
+            
+            logger.info("Installing dependencies from pyproject.toml")
+            
+            # Create a virtual environment for the project
+            venv_dir = project_dir / ".venv"
+            subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+            
+            # Get the pip executable from the virtual environment
+            pip_cmd = str(venv_dir / "bin" / "pip") if not os.name == "nt" else str(venv_dir / "Scripts" / "pip")
+            
+            # Install Poetry if using Poetry project
+            if "tool" in pyproject_data and "poetry" in pyproject_data["tool"]:
+                dependencies = []
+                
+                # Get dependencies from pyproject.toml
+                if "dependencies" in pyproject_data["tool"]["poetry"]:
+                    for dep, version in pyproject_data["tool"]["poetry"]["dependencies"].items():
+                        if dep != "python":  # Skip python version constraint
+                            if isinstance(version, str):
+                                dependencies.append(f"{dep}{version}")
+                            else:
+                                dependencies.append(dep)
+                
+                # Install dependencies
+                if dependencies:
+                    cmd = [pip_cmd, "install"] + dependencies
+                    logger.info(f"Running: {' '.join(cmd)}")
+                    subprocess.run(cmd, check=True)
+                    
+                # Install development dependencies
+                dev_dependencies = []
+                if "group" in pyproject_data["tool"]["poetry"] and "dev" in pyproject_data["tool"]["poetry"]["group"]:
+                    dev_deps = pyproject_data["tool"]["poetry"]["group"]["dev"]["dependencies"]
+                    for dep, version in dev_deps.items():
+                        if isinstance(version, str):
+                            dev_dependencies.append(f"{dep}{version}")
+                        else:
+                            dev_dependencies.append(dep)
+                
+                if dev_dependencies:
+                    cmd = [pip_cmd, "install"] + dev_dependencies
+                    logger.info(f"Running: {' '.join(cmd)}")
+                    subprocess.run(cmd, check=True)
+            
+            # Install the project itself in development mode
+            subprocess.run([pip_cmd, "install", "-e", str(project_dir)], check=True)
+            
+        except Exception as e:
+            logger.error(f"Error installing dependencies from pyproject.toml: {e}")
+    
+    # Fallback to requirements.txt
+    elif requirements_path.exists():
+        try:
+            logger.info("Installing dependencies from requirements.txt")
+            
+            # Create a virtual environment for the project
+            venv_dir = project_dir / ".venv"
+            subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+            
+            # Get the pip executable from the virtual environment
+            pip_cmd = str(venv_dir / "bin" / "pip") if not os.name == "nt" else str(venv_dir / "Scripts" / "pip")
+            
+            # Install dependencies from requirements.txt
+            subprocess.run([pip_cmd, "install", "-r", str(requirements_path)], check=True)
+            
+            # Install the project itself in development mode
+            subprocess.run([pip_cmd, "install", "-e", str(project_dir)], check=True)
+            
+        except Exception as e:
+            logger.error(f"Error installing dependencies from requirements.txt: {e}")
+    else:
+        logger.warning("No dependency files (pyproject.toml or requirements.txt) found")
 
 def inject_mutation_support(target_file):
     """

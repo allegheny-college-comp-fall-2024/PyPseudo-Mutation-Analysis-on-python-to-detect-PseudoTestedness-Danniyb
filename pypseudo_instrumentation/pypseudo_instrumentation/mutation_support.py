@@ -118,7 +118,7 @@ class MutationPlugin:
         
         Args:
             mutant_id: Identifier for the mutation
-            
+                
         Returns:
             bool: True if the mutation should be enabled, False otherwise
         """
@@ -126,34 +126,44 @@ class MutationPlugin:
         if _coverage_data['collecting']:
             register_coverage(mutant_id, _coverage_data['current_test'])
             return False
-            
+                
         if not self.config.get('enable_mutation', False):
             # Short-circuit if mutations are globally disabled
             logger.debug(f"Mutation check [{mutant_id}]: disabled globally")
             return False
 
         parts = mutant_id.split('_')
-        if len(parts) < 2:
-            logger.debug(f"Mutation check [{mutant_id}]: invalid format")
+        if len(parts) < 3:  # We expect at least 3 parts for both XMT and SDL
+            logger.debug(f"Mutation check [{mutant_id}]: invalid format, expected at least 3 parts")
             return False
-            
+                
         mut_type = parts[0]  # xmt or sdl
         
-        # For XMT: parts[1] is function name, parts[2] is number 
-        # For SDL: parts[1] is statement type, parts[2] is module, parts[3] is function, parts[4] is number
-        
+        # For XMT: format is now xmt_function_filename_number 
         if mut_type == 'xmt':
-            target_name = '_'.join(parts[1:-1]) if len(parts) > 2 else parts[1]
-            mutation_num = parts[-1] if len(parts) > 2 else None
+            function_name = parts[1]
+            file_name = parts[2]
+            mutation_num = parts[3] if len(parts) > 3 else None
+            
+            logger.debug(f"Mutation check [{mutant_id}]:")
+            logger.debug(f"- Type: {mut_type}")
+            logger.debug(f"- Function: {function_name}")
+            logger.debug(f"- File: {file_name}")
+            logger.debug(f"- Number: {mutation_num}")
         else:  # SDL
+            # SDL format: sdl_statement-type_filename_function_number
             target_name = parts[1]  # statement type (for, if, etc.)
+            file_name = parts[2]
+            function_name = parts[3] if len(parts) > 3 else None
             mutation_num = parts[-1]
             
-        logger.debug(f"Mutation check [{mutant_id}]:")
-        logger.debug(f"- Type: {mut_type}")
-        logger.debug(f"- Target name: {target_name}")
-        logger.debug(f"- Number: {mutation_num}")
-            
+            logger.debug(f"Mutation check [{mutant_id}]:")
+            logger.debug(f"- Type: {mut_type}")
+            logger.debug(f"- Statement type: {target_name}")
+            logger.debug(f"- File: {file_name}")
+            logger.debug(f"- Function: {function_name}")
+            logger.debug(f"- Number: {mutation_num}")
+                
         # Single mutant case (specific mutation enabled)
         if len(self.enabled_mutants) == 1 and self.enabled_mutants[0].get('target') != '*':
             if mut_type == 'xmt':
@@ -177,8 +187,7 @@ class MutationPlugin:
                         return True
                     
                     # Check exact match for XMT
-                    full_target = f"{target_name}_{mutation_num}" if mutation_num else target_name
-                    target_match = mutant['target'] == full_target
+                    target_match = mutant['target'] == mutant_id
                     logger.debug(f"- XMT specific match: {target_match}")
                     return target_match
                 else:  # SDL
@@ -192,7 +201,7 @@ class MutationPlugin:
                     
         logger.debug("- No matching mutation found")
         return False
-
+    
 def find_config_file():
     """
     Find the mutation configuration file.

@@ -391,23 +391,69 @@ def run_single_mutation_test(args, mutation_id, pytest_args, working_dir=None):
         int: Test result (0 for pass, non-zero for fail)
     """
     try:
+        # Make sure working_dir is a Path object
+        if working_dir and not isinstance(working_dir, Path):
+            working_dir = Path(working_dir)
+            
+        # Set up json-report for pytest
+        json_report_file = working_dir / '.pypseudo' / 'pytest_report.json'
+        os.makedirs(os.path.dirname(json_report_file), exist_ok=True)
+        
+        # Add json-report to pytest args if not already there
+        json_report_args = []
+        if not any('--json-report' in arg for arg in pytest_args):
+            json_report_args.append('--json-report')
+        if not any('--json-report-file' in arg for arg in pytest_args):
+            json_report_args.append(f'--json-report-file={json_report_file}')
+        
         # Create mutation config with only the specified mutation
-        mutants_config = {
-            'enable_mutation': True,
-            'enabled_mutants': [{'type': mutation_id.split('_')[0], 'target': mutation_id}]
-        }
+        mut_type = 'xmt' if mutation_id.startswith('xmt_') else 'sdl'
+        
+        if mut_type == 'xmt':
+            mutants_config = {
+                'enable_mutation': True,
+                'enabled_mutants': [{
+                    'type': 'xmt',
+                    'target': mutation_id
+                }]
+            }
+        else:  # SDL
+            parts = mutation_id.split('_')
+            if len(parts) > 1:
+                stmt_type = parts[1]
+                mutants_config = {
+                    'enable_mutation': True,
+                    'enabled_mutants': [{
+                        'type': 'sdl',
+                        'target': [stmt_type]
+                    }]
+                }
+            else:
+                logger.warning(f"Invalid mutant ID format: {mutation_id}")
+                return 1
         
         # Write temporary mutation config
-        with open(args.mutant_file, 'w') as f:
+        config_path = str(working_dir / '.pypseudo' / 'mutants.json')
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, 'w') as f:
             json.dump(mutants_config, f, indent=4)
             
         # Set environment variable for config path
-        if working_dir:
-            config_path = str(working_dir / '.pypseudo' / 'mutants.json')
-            os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+        os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
             
         # Run tests
-        return run_tests(args.mutant_file, pytest_args, working_dir)
+        env = os.environ.copy()
+        cmd = ["python", "-m", "pytest"] + pytest_args + json_report_args
+        
+        process = subprocess.run(
+            cmd,
+            cwd=working_dir,
+            env=env,
+            capture_output=True, 
+            text=True
+        )
+        
+        return process.returncode
         
     except Exception as e:
         logger.error(f"Error running mutation {mutation_id}: {e}")
@@ -765,14 +811,6 @@ def run_all_mutations(args, pytest_args, working_dir=None):
     Run tests with mutations grouped by test coverage.
     This is more efficient than running each mutation separately.
     """
-    import os
-    import json
-    import datetime
-    import subprocess
-    import sys
-    import re
-    from pathlib import Path
-    
     # Ensure working_dir is a Path object
     if working_dir is not None and not isinstance(working_dir, Path):
         working_dir = Path(working_dir)
@@ -780,39 +818,91 @@ def run_all_mutations(args, pytest_args, working_dir=None):
     logger.info(f"Running all mutations for project: {args.project_path}")
     logger.info(f"Working directory: {working_dir}")
     
-    # Get list of mutants from the instrumented code
-    all_mutants = []
-    
-    # Pattern to match mutation IDs in code
-    pattern = re.compile(r"is_mutant_enabled\(['\"](xmt_[^'\"]+|sdl_[^'\"]+)['\"]")
-    
-    # Search through all Python files
-    for root, dirs, files in os.walk(working_dir):
-        for file in files:
-            if file.endswith('.py'):
-                file_path = os.path.join(root, file)
-                try:
-                    with open(file_path, 'r') as f:
-                        content = f.read()
-                        matches = pattern.findall(content)
-                        all_mutants.extend(matches)
-                except:
-                    pass
-    
-    # Remove duplicates
-    all_mutants = list(set(all_mutants))
+    # Get list of mutants from the instrumented code using collect_existing_mutants
+    # This avoids regex parsing of each file directly
+    mutant_data = collect_existing_mutants(working_dir)
+    all_mutants = mutant_data.get('mutants', [])
     
     logger.info(f"Found {len(all_mutants)} mutants in the instrumented code")
     
-    # Function to run a single mutant test
-    def run_single_mutant_test(mutant_id):
-        """Run a single mutation test"""
+    # Set up json-report for pytest
+    json_report_file = working_dir / '.pypseudo' / 'pytest_report.json'
+    os.makedirs(os.path.dirname(json_report_file), exist_ok=True)
+    
+    # Add json-report to pytest args if not already there
+    json_report_args = []
+    if not any('--json-report' in arg for arg in pytest_args):
+        json_report_args.append('--json-report')
+    if not any('--json-report-file' in arg for arg in pytest_args):
+        json_report_args.append(f'--json-report-file={json_report_file}')
+    
+    # Function to run tests with json report
+    def run_tests_with_config(config, label=""):
+        # Write the configuration
+        config_path = str(working_dir / '.pypseudo' / 'mutants.json')
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
+        
+        # Set environment variable
+        os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
+        
+        # Run tests
+        logger.info(f"Running {label} tests")
+        
+        # Use existing test runner pattern for consistency
+        env = os.environ.copy()
+        cmd = ["python", "-m", "pytest"] + pytest_args + json_report_args
+        
+        process = subprocess.run(
+            cmd,
+            cwd=working_dir,
+            env=env,
+            capture_output=True, 
+            text=True
+        )
+        
+        # Read json report
+        try:
+            with open(json_report_file, 'r') as f:
+                return json.load(f), process.returncode
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.error(f"Error reading JSON report: {e}")
+            return None, process.returncode
+    
+    # First, run tests with no mutations (baseline)
+    logger.info("Running baseline tests (no mutations)")
+    baseline_config = {
+        'enable_mutation': False,
+        'enabled_mutants': []
+    }
+    baseline_report, baseline_exit_code = run_tests_with_config(baseline_config, "baseline")
+    
+    if not baseline_report:
+        logger.error("Failed to get baseline results")
+        return {}
+    
+    # Extract test outcomes from baseline results
+    baseline_test_outcomes = {}
+    for test in baseline_report.get('tests', []):
+        test_id = test.get('nodeid')
+        outcome = test.get('outcome')
+        baseline_test_outcomes[test_id] = outcome == 'passed'
+    
+    logger.info(f"Baseline tests: {sum(1 for r in baseline_test_outcomes.values() if r)} passed, "
+                f"{sum(1 for r in baseline_test_outcomes.values() if not r)} failed")
+    
+    # Now run each mutant
+    results = {}
+    for i, mutant_id in enumerate(all_mutants):
+        logger.info(f"Testing mutant {i+1}/{len(all_mutants)}: {mutant_id}")
+        
         # Determine mutant type
         mut_type = 'xmt' if mutant_id.startswith('xmt_') else 'sdl'
         
-        # Create the mutant configuration
+        # Create the mutant configuration - use the same format as single-mutant
         if mut_type == 'xmt':
-            mutants_config = {
+            mutant_config = {
                 'enable_mutation': True,
                 'enabled_mutants': [{
                     'type': 'xmt',
@@ -823,7 +913,7 @@ def run_all_mutations(args, pytest_args, working_dir=None):
             parts = mutant_id.split('_')
             if len(parts) > 1:
                 stmt_type = parts[1]
-                mutants_config = {
+                mutant_config = {
                     'enable_mutation': True,
                     'enabled_mutants': [{
                         'type': 'sdl',
@@ -832,143 +922,68 @@ def run_all_mutations(args, pytest_args, working_dir=None):
                 }
             else:
                 logger.warning(f"Invalid mutant ID format: {mutant_id}")
-                return None
+                continue
         
-        # Write the mutant configuration
-        with open(args.mutant_file, 'w') as f:
-            json.dump(mutants_config, f, indent=4)
-            
-        # Set environment variable for config path
-        if working_dir:
-            config_path = str(working_dir / '.pypseudo' / 'mutants.json')
-            os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
-            
-            # Copy the config to the working directory
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            with open(config_path, 'w') as f:
-                json.dump(mutants_config, f, indent=4)
+        # Run tests with the mutant
+        mutant_report, mutant_exit_code = run_tests_with_config(mutant_config, f"mutant {mutant_id}")
         
-        # Run pytest directly to match the approach in --run
-        test_results = {}
+        if not mutant_report:
+            logger.error(f"Failed to get results for mutant {mutant_id}")
+            continue
         
-        logger.info(f"Running tests with mutant {mutant_id}")
+        # Extract test outcomes with this mutant
+        mutant_test_outcomes = {}
+        for test in mutant_report.get('tests', []):
+            test_id = test.get('nodeid')
+            outcome = test.get('outcome')
+            mutant_test_outcomes[test_id] = outcome == 'passed'
         
-        # First, run all the tests once to see which ones pass and fail
-        cmd = f"cd {working_dir} && python -m pytest -v"
-        process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        # A mutant is killed if ANY test that passed in the baseline now fails
+        killed = False
+        killed_by = []
         
-        # Extract test results from the output
-        test_cases = []
-        failed_tests = []
-        passed_tests = []
+        for test_id, passed_in_baseline in baseline_test_outcomes.items():
+            if passed_in_baseline:  # Test passed in baseline
+                passed_with_mutant = mutant_test_outcomes.get(test_id, False)
+                if not passed_with_mutant:  # Test now fails with mutant
+                    killed = True
+                    killed_by.append(test_id)
         
-        # Parse pytest output to identify which tests passed/failed
-        for line in process.stdout.split('\n'):
-            if 'PASSED' in line or 'FAILED' in line:
-                test_match = re.search(r'(test_[^:]+)::(test_\w+)', line)
-                if test_match:
-                    test_file = test_match.group(1)
-                    test_case = test_match.group(2)
-                    test_cases.append(test_case)
-                    
-                    if 'PASSED' in line:
-                        passed_tests.append(test_case)
-                    else:
-                        failed_tests.append(test_case)
-        
-        # Analyze the results
-        mutant_passed = (process.returncode == 0)
-        
-        # Determine if the mutant was killed or survived
-        result = {
-            'passed': mutant_passed,  # True if tests passed (mutant survived)
+        # Store the result
+        results[mutant_id] = {
+            'passed': not killed,  # True if mutant survived (no test killed it)
             'test': {
-                'file': '',  # We don't track by file here
-                'test_cases': test_cases,
-                'passed_tests': passed_tests,
-                'failed_tests': failed_tests
-            },
-            'type': mut_type
+                'killed_by': killed_by,
+                'mutant_type': mut_type
+            }
         }
         
-        return result
-    
-    # First, run without any mutations to establish baseline
-    logger.info("Running baseline test without mutations")
-    
-    # Create baseline config with no mutations enabled
-    baseline_config = {
-        'enable_mutation': False,
-        'enabled_mutants': []
-    }
-    
-    # Write baseline config
-    with open(args.mutant_file, 'w') as f:
-        json.dump(baseline_config, f, indent=4)
-        
-    # Copy to working directory
-    config_path = str(working_dir / '.pypseudo' / 'mutants.json')
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, 'w') as f:
-        json.dump(baseline_config, f, indent=4)
-    
-    # Set environment variable for config path
-    os.environ['PYPSEUDO_CONFIG_FILE'] = config_path
-    
-    # Run baseline tests
-    cmd = f"cd {working_dir} && python -m pytest -v"
-    baseline_process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    
-    # Parse baseline results
-    baseline_test_results = {}
-    for line in baseline_process.stdout.split('\n'):
-        if 'PASSED' in line or 'FAILED' in line:
-            test_match = re.search(r'(test_[^:]+)::(test_\w+)', line)
-            if test_match:
-                test_file = test_match.group(1)
-                test_case = test_match.group(2)
-                baseline_test_results[test_case] = 'PASSED' in line
-    
-    logger.info(f"Baseline test completed with {sum(1 for r in baseline_test_results.values() if r)} passed tests")
-    
-    # Now run each mutant individually
-    results = {}
-    for mutant_id in all_mutants:
-        logger.info(f"Testing mutant {mutant_id}")
-        mutant_result = run_single_mutant_test(mutant_id)
-        if mutant_result:
-            results[mutant_id] = mutant_result
-    
-    # Process results to determine if mutants were killed or survived
-    for mutant_id, result in results.items():
-        # Compare test results with baseline
-        mutant_passed_tests = set(result['test']['passed_tests'])
-        baseline_passed_tests = {t for t, p in baseline_test_results.items() if p}
-        
-        # If any test that passed in the baseline now fails, the mutant was killed
-        was_killed = baseline_passed_tests - mutant_passed_tests
-        if was_killed:
-            result['passed'] = False  # Mutant killed (test failed)
-            result['killed_by'] = list(was_killed)
+        # Debug log
+        if killed:
+            logger.info(f"Mutant {mutant_id} was KILLED by {len(killed_by)} tests")
         else:
-            result['passed'] = True   # Mutant survived (all tests passed)
+            logger.info(f"Mutant {mutant_id} SURVIVED!")
     
     # Count killed and survived mutations
-    killed = sum(1 for r in results.values() if r.get('passed') is False)
-    survived = sum(1 for r in results.values() if r.get('passed') is True)
-    unknown = sum(1 for r in results.values() if r.get('passed') is None)
+    killed = sum(1 for r in results.values() if not r.get('passed', True))
+    survived = sum(1 for r in results.values() if r.get('passed', False))
     
     report = {
         'summary': {
             'total_mutations': len(results),
             'killed_mutations': killed,
             'survived_mutations': survived,
-            'unknown_mutations': unknown
+            'unknown_mutations': 0
         },
         'mutations': results,
         'metadata': {
             'timestamp': datetime.datetime.now().isoformat(),
-            'target': str(args.project_path)
+            'target': str(args.project_path),
+            'baseline_tests': {
+                'total': len(baseline_test_outcomes),
+                'passed': sum(1 for r in baseline_test_outcomes.values() if r),
+                'failed': sum(1 for r in baseline_test_outcomes.values() if not r)
+            }
         }
     }
     
@@ -983,15 +998,13 @@ def run_all_mutations(args, pytest_args, working_dir=None):
     print(f"Total Mutations: {len(results)}")
     print(f"Killed Mutations: {killed}")
     print(f"Survived Mutations: {survived}")
-    if unknown > 0:
-        print(f"Unknown Mutations: {unknown} (due to baseline test failures)")
     
     # Print pseudo-tested code information
     if survived > 0:
         print("\nPseudo-tested code detected!")
         print("The following mutants survived (code is pseudo-tested):")
         for mutant_id, result in results.items():
-            if result.get('passed') is True:
+            if result.get('passed', False):
                 print(f"  - {mutant_id}")
     
     print(f"\nDetailed results written to {report_path}")
@@ -1238,7 +1251,7 @@ def main():
                        help='Run tests with only specified mutant enabled (e.g., "xmt_add_1" or "sdl_for_1")')
     
     # Reporting arguments
-    parser.add_argument('--mutant-file', required=True, help='Path to the mutant file')
+    parser.add_argument('--mutant-file', required=False, help='Path to the mutant file')
     parser.add_argument('--json-report', action='store_true', help='Generate a JSON report')
     parser.add_argument('--json-report-file', help='Path to save the JSON report')
     parser.add_argument('--cov', help='Module or directory to measure coverage for')
@@ -1258,6 +1271,24 @@ def main():
         logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
         return
 
+    # Set default mutant file if not provided
+    # Handle default mutant file path
+    if not args.mutant_file:
+        project_path = Path(args.project_path)
+        # Try in project config directory
+        default_mutant_file = project_path / 'config' / 'mutants.json'
+        if default_mutant_file.exists():
+            args.mutant_file = str(default_mutant_file)
+        else:
+            # Fall back to the default mutants.json in the tool's directory
+            default_mutant_file = Path(__file__).parent.parent / 'config' / 'mutants.json'
+            if default_mutant_file.exists():
+                args.mutant_file = str(default_mutant_file)
+            else:
+                # Last resort - use the one in the current directory
+                args.mutant_file = 'mutants.json'
+        print(f"Using default mutant file: {args.mutant_file}")
+    
     # Prepare pytest arguments
     pytest_args = []
     if args.json_report:

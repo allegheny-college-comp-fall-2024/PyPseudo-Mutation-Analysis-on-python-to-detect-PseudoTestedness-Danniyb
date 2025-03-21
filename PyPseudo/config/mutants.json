@@ -1,9 +1,19 @@
 {
-    "enable_mutation": true,
+    "enable_mutation": false,
     "enabled_mutants": [
         {
             "type": "xmt",
-            "target": "xmt_stop_21"
+            "target": "*"
+        },
+        {
+            "type": "sdl",
+            "target": [
+                "for",
+                "if",
+                "while",
+                "return",
+                "try"
+            ]
         }
     ]
 }

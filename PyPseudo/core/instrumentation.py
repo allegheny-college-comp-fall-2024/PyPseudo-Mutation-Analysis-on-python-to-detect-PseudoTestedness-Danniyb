@@ -5,6 +5,8 @@ import logging
 import shutil
 import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 from .utils import setup_project_environment, inject_mutation_support, copy_support_files
 
@@ -128,14 +130,16 @@ class MutantInserter(ast.NodeTransformer):
         
         if node.name.startswith('__') and node.name.endswith('__'):
             return node
-            
+                
         if not has_xmt and ('*' in self.xmt_targets or node.name in self.xmt_targets):
-            mutation_id = f"xmt_{node.name}_{self.counters['xmt']}"
+            # Include module name in the mutation ID (same format as SDL)
+            # This is the key change - using self.current_module to include file info
+            mutation_id = f"xmt_{node.name}_{self.current_module}_{self.counters['xmt']}"
             self.counters['xmt'] += 1
 
             return_value = self._analyze_return_value(node)
 
-            # Use the global is_mutant_enabled function instead of any instance attributes
+            # Use the global is_mutant_enabled function
             mutation_check = ast.If(
                 test=ast.Call(
                     func=ast.Name(id='is_mutant_enabled', ctx=ast.Load()),
@@ -145,7 +149,7 @@ class MutantInserter(ast.NodeTransformer):
                 body=[
                     ast.Expr(value=ast.Call(
                         func=ast.Name(id='print', ctx=ast.Load()),
-                        args=[ast.Constant(value=f'XMT: Removing body of function {node.name}')],
+                        args=[ast.Constant(value=f'XMT: Removing body of function {node.name} in {self.current_module}')],
                         keywords=[]
                     )),
                     ast.Return(value=return_value)
@@ -157,7 +161,7 @@ class MutantInserter(ast.NodeTransformer):
             logger.info(f"Added XMT mutation {mutation_id} to function {node.name}")
         
         return node
-
+    
     def visit_If(self, node):
         """Handle SDL mutations for if statements"""
         self.nodes_visited['if'] += 1
@@ -413,6 +417,18 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
             logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
             return
 
+        # Get the project directory (parent of the file being instrumented)
+        project_dir = Path(input_file).parent
+        while project_dir.name and not (project_dir / "pyproject.toml").exists() and not (project_dir / "setup.py").exists():
+            project_dir = project_dir.parent
+        
+        # Use the project's virtual environment if available
+        venv_dir = project_dir / ".venv"
+        python_exe = str(venv_dir / "bin" / "python") if not os.name == "nt" else str(venv_dir / "Scripts" / "python")
+        if not os.path.exists(python_exe):
+            python_exe = sys.executable  # Fall back to the current Python executable
+        
+
         with open(mutant_file) as f:
             mutants_data = json.load(f)
             enabled_mutants = mutants_data.get('enabled_mutants', [])
@@ -420,10 +436,10 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Get module name from file path
-        module_name = Path(input_file).stem
-        # Get the actual filename for module identification
-        filename = Path(input_file).name
+        # Get module name from file path - use the filename itself
+        file_path = Path(input_file)
+        module_name = file_path.stem
+        filename = file_path.name  # Get the actual filename with extension
 
         is_test_file = module_name.startswith('test_') or 'test' in module_name
 
@@ -488,7 +504,17 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
             source_code = import_header + source_code
             
             # Now instrument the code
-            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
+            # Parse the AST and set the module_name to the filename
+            tree = ast.parse(source_code)
+            tree.module_name = filename  # Use filename instead of just stem
+            
+            if safe_mode:
+                # Use safe mode instrumentation for complex libraries
+                mutated_code = instrument_code_safe(source_code, 'plugin', enabled_mutants, filename)
+            else:
+                # Standard instrumentation
+                mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
+                
             source_code = mutated_code
 
         with open(input_file, 'w') as f:
@@ -508,6 +534,19 @@ def process_project(project_path, mutant_file, safe_mode=False):
         safe_mode: Whether to use conservative instrumentation for complex projects
     """
     try:
+        # Ensure required packages are installed in the working directory
+        try:
+            logger.info("Installing required packages in working directory...")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "pytest-json-report"],
+                check=True,
+                capture_output=True
+            )
+            logger.info("Required packages installed successfully.")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to install required packages: {e}")
+            logger.error(f"stdout: {e.stdout.decode()}")
+            logger.error(f"stderr: {e.stderr.decode()}")
         # Check if pypseudo_instrumentation is installed
         try:
             import pypseudo_instrumentation
@@ -544,6 +583,8 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
                 run_instrumentation(py_file, mutant_file, safe_mode=safe_mode)
                 
         return working_dir
+    
+        
     except Exception as e:
         logger.error(f"Error processing project: {e}")
         raise
