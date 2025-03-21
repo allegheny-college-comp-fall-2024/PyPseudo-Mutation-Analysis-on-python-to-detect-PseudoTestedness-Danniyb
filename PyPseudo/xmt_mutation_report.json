@@ -1,0 +1,17 @@
+{
+    "summary": {
+        "total_mutations": 0,
+        "killed_mutations": 0,
+        "survived_mutations": 0,
+        "unknown_mutations": 0
+    },
+    "mutations": {},
+    "metadata": {
+        "timestamp": "2025-03-15T13:54:34.554392",
+        "target": "../../../deepdiff",
+        "baseline_tests": {
+            "total": 949,
+            "passed": 949
+        }
+    }
+}
