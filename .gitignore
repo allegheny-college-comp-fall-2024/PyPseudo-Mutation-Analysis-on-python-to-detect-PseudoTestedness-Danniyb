@@ -26,6 +26,17 @@ env/
 venv/
 ENV/
 
+# Poetry
+poetry.lock  # Uncomment this if you want to track lock files in version control
+.python-version
+**/poetry.lock
+
+# Poetry virtual environments
+**/virtualenvs/
+**/poetry/
+.poetry/
+.cache/
+
 # Distribution / packaging
 .Python
 build/
@@ -61,3 +72,7 @@ pip-delete-this-directory.txt
 # pytest plugins (specific plugin configurations)
 *.pytest_cache/
 *.tox/
+
+# PyPseudo specific directories
+*_pypseudo_work/
+.pypseudo/

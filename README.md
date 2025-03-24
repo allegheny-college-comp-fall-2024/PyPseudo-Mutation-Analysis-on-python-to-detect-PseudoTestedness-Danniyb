@@ -23,19 +23,19 @@ Even though the test covers 100% of the code, it doesn't verify that the functio
 
 1. Clone the repository:
    ```bash
-   git clone hgit@github.com:allegheny-college-comp-fall-2024/PyPseudo-Mutation-Analysis-on-python-to-detect-PseudoTestedness-Danniyb.git
+   git clone https://github.com/your-username/PyPseudo-Mutation-Analysis-on-python-to-detect-PseudoTestedness.git
    cd pypseudo
    ```
 
 2. Install the main PyPseudo tool:
    ```bash
-   pip install -e .
+   poetry install
    ```
 
 3. Install the instrumentation support package:
    ```bash
    cd pypseudo_instrumentation
-   pip install -e .
+   poetry install
    cd ..
    ```
 
@@ -49,13 +49,48 @@ First, instrument the project with mutations:
 
 ```bash
 # Instrument with XMT (Extreme Mutation Testing)
-python -m cli.main --instrument --xmt --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --instrument --xmt --project-path=/path/to/project
 
 # Instrument with SDL (Statement Deletion)
-python -m cli.main --instrument --sdl --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --instrument --sdl --project-path=/path/to/project
 
 # Instrument with both XMT and SDL
-python -m cli.main --instrument --xmt --sdl --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --instrument --xmt --sdl --project-path=/path/to/project
+```
+
+Example output:
+```
+$ poetry run pypseudo --instrument --xmt --sdl --project-path=../../../simplePro
+Using default mutant file: /Users/danielbekele/senior/comp/PyPseudo-Mutation-Analysis-on-python-to-detect-PseudoTestedness-Danniyb/pypseudo/config/mutants.json
+
+=== Debug: Filter Mutations Start ===
+Initial mutants_data: {
+  "enable_mutation": false,
+  "enabled_mutants": [
+    {
+      "type": "xmt",
+      "target": "*"
+    },
+    {
+      "type": "sdl",
+      "target": [
+        "for",
+        "if",
+        "while",
+        "return",
+        "try"
+      ]
+    }
+  ]
+}
+2025-03-21 09:25:09,424 - root - INFO - Running instrumentation...
+2025-03-21 09:25:09,424 - core.instrumentation - INFO - Installing required packages in working directory...
+2025-03-21 09:25:09,739 - core.instrumentation - INFO - Required packages installed successfully.
+2025-03-21 09:25:09,742 - core.utils - WARNING - No dependency files (pyproject.toml or requirements.txt) found
+2025-03-21 09:25:09,744 - core.instrumentation - INFO - Starting code instrumentation
+2025-03-21 09:25:09,744 - core.instrumentation - INFO - Initialized with targets - XMT: {'*'}, SDL: {'for', 'try', 'if', 'while', 'return'}
+...
+2025-03-21 09:25:09,748 - root - INFO - Instrumentation complete
 ```
 
 ### 2. Run Tests with Mutations
@@ -64,13 +99,13 @@ After instrumentation, run tests with mutations enabled:
 
 ```bash
 # Run with XMT mutations
-python -m cli.main --run --xmt --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --run --xmt --project-path=/path/to/project
 
 # Run with SDL mutations
-python -m cli.main --run --sdl --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --run --sdl --project-path=/path/to/project
 
 # Run with both XMT and SDL
-python -m cli.main --run --xmt --sdl --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --run --xmt --sdl --project-path=/path/to/project
 ```
 
 ### 3. Run All Mutations Efficiently
@@ -78,7 +113,7 @@ python -m cli.main --run --xmt --sdl --project-path=/path/to/project --mutant-fi
 To run all mutations grouped by test coverage (more efficient):
 
 ```bash
-python -m cli.main --run-all-mutations --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --run-all-mutations --project-path=/path/to/project
 ```
 
 This optimized mode:
@@ -92,7 +127,7 @@ This optimized mode:
 To see all mutations available in a project:
 
 ```bash
-python -m cli.main --list-mutations --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --list-mutations --project-path=/path/to/project
 ```
 
 ### 5. Run with Specific Mutation
@@ -100,7 +135,7 @@ python -m cli.main --list-mutations --project-path=/path/to/project --mutant-fil
 To test with a specific mutation:
 
 ```bash
-python -m cli.main --run --enable-mutations --single-mutant=xmt_add_1 --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --run --enable-mutations --single-mutant=xmt_add_1 --project-path=/path/to/project
 ```
 
 ### 6. Restore Project
@@ -108,7 +143,7 @@ python -m cli.main --run --enable-mutations --single-mutant=xmt_add_1 --project-
 To restore a project to its original state:
 
 ```bash
-python -m cli.main --restore --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry run pypseudo --restore --project-path=/path/to/project
 ```
 
 ## Command Line Options
@@ -121,7 +156,7 @@ python -m cli.main --restore --project-path=/path/to/project --mutant-file=confi
 --run-all-mutations  Run optimized mutation testing by test coverage
 
 --project-path PATH  Path to the project to analyze
---mutant-file FILE   Path to the mutation configuration file
+--mutant-file FILE   Path to the mutation configuration file (optional)
 --xmt                Use extreme mutation testing
 --sdl                Use statement deletion testing
 --enable-mutations   Enable mutations during test run
@@ -143,42 +178,59 @@ PyPseudo supports two types of mutations:
 
 Removes entire function bodies and replaces them with default return values. This identifies functions that are executed by tests but whose results aren't actually verified.
 
-Example:
+Example from an instrumented file:
 ```python
-# Original function
-def add(a, b):
+def add(self, a, b):
+    if is_mutant_enabled('xmt_add_calculator.py_1'):
+        print('XMT: Removing body of function add in calculator.py')
+        return None
     result = a + b
-    return result
-
-# XMT mutation
-def add(a, b):
-    if is_mutant_enabled('xmt_add_1'):
-        print('XMT: Removing body of function add')
-        return 0  # Default return value
-    result = a + b
-    return result
+    return 0 if result == 0 else result
 ```
 
 ### Statement Deletion (SDL)
 
 Removes individual statements to identify statements that are executed but not verified by tests.
 
-Example:
+Example from an instrumented file:
 ```python
-# Original code
-if condition:
-    do_something()
-    log_action()  # This might be pseudo-tested
-
-# SDL mutation
-if condition:
-    do_something()
-    if is_mutant_enabled('sdl_if_1'):
-        print('SDL: Skipping statement')
-        pass
-    else:
-        log_action()
+if is_mutant_enabled('sdl_if_calculator.py_special_multiply_1'):
+    print('SDL: Skipping if statement')
+    pass
+elif result > 1000:
+    result += 1
 ```
+
+## Mutation Configuration
+
+PyPseudo uses a JSON configuration file to define which mutations to apply. The default file structure looks like:
+
+```json
+{
+  "enable_mutation": false,
+  "enabled_mutants": [
+    {
+      "type": "xmt",
+      "target": "*"
+    },
+    {
+      "type": "sdl",
+      "target": [
+        "for",
+        "if",
+        "while",
+        "return",
+        "try"
+      ]
+    }
+  ]
+}
+```
+
+This configuration allows you to:
+- Enable/disable all mutations
+- Target specific types of statements for SDL mutations
+- Target specific functions or use wildcards for XMT mutations
 
 ## Architecture
 
@@ -195,6 +247,19 @@ The tool works by:
 3. Running tests with specific mutations enabled
 4. Identifying which mutations cause test failures and which don't
 
+## How Instrumentation Works
+
+When PyPseudo instruments a file, it adds imports at the top of each file:
+
+```python
+import os
+from pathlib import Path
+from pypseudo_instrumentation import is_mutant_enabled
+os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / 'mutants.json')
+```
+
+Then, for each function and target statement, it adds conditional checks to enable or disable mutations at runtime.
+
 ## Interpreting Results
 
 After running PyPseudo, you'll get a report showing:
@@ -207,14 +272,6 @@ Focus on fixing the pseudo-tested code by:
 2. Creating new tests that specifically verify it
 3. Removing truly unused code
 
-## Limitations
-
-PyPseudo may face challenges with:
-- Complex Python libraries that use metaclasses (use `--safe-mode`)
-- Projects with custom test runners
-- Code with extensive metaprogramming
-- Projects that heavily rely on C extensions
-
 ## Troubleshooting
 
 ### Module Not Found Errors
@@ -223,21 +280,13 @@ If you see `ModuleNotFoundError: No module named 'pypseudo_instrumentation'`:
 
 ```bash
 cd pypseudo_instrumentation
-pip install -e .
-```
-
-### Metaclass Conflicts
-
-If you encounter "metaclass conflicts" with complex libraries:
-
-```bash
-python -m cli.main --instrument --xmt --safe-mode --project-path=/path/to/project --mutant-file=config/mutants.json
+poetry install
 ```
 
 ### Test Collection Errors
 
 If pytest can't collect tests after instrumentation, check:
-1. Python path issues (try `export PYTHONPATH=/path/to/project_pypseudo_work`)
+1. Python path issues (try setting `PYTHONPATH` appropriately)
 2. Import errors in test files
 3. Compatibility with your pytest plugins
 

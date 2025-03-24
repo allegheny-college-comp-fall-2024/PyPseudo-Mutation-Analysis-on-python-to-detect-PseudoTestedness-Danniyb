@@ -15,7 +15,21 @@ import tempfile
 import subprocess
 import re
 import glob
+from pypseudo.core.instrumentation import *  # Use full package path
 
+# Add the parent directory to Python path to find pypseudo_instrumentation
+current_file = Path(__file__)
+parent_dir = current_file.parent.parent.parent  # Adjust depending on the actual structure
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
+try:
+    import pypseudo_instrumentation
+except ImportError:
+    print("ERROR: pypseudo_instrumentation package is not installed or not in Python path.")
+    print(f"Current Python path: {sys.path}")
+    print("Please install it with: poetry install -e ./pypseudo_instrumentation")
+    sys.exit(1)
 
 # Add parent directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))

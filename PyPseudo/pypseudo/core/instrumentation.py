@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from .utils import setup_project_environment, inject_mutation_support, copy_support_files
+from .utils import * 
 
 # Configure logging for better debugging and monitoring
 logging.basicConfig(level=logging.INFO)
@@ -414,20 +414,8 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
             import pypseudo_instrumentation
         except ImportError:
             logger.error("ERROR: pypseudo_instrumentation package is not installed.")
-            logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
+            logger.error("Please install it with: poetry install -e ./pypseudo_instrumentation")
             return
-
-        # Get the project directory (parent of the file being instrumented)
-        project_dir = Path(input_file).parent
-        while project_dir.name and not (project_dir / "pyproject.toml").exists() and not (project_dir / "setup.py").exists():
-            project_dir = project_dir.parent
-        
-        # Use the project's virtual environment if available
-        venv_dir = project_dir / ".venv"
-        python_exe = str(venv_dir / "bin" / "python") if not os.name == "nt" else str(venv_dir / "Scripts" / "python")
-        if not os.path.exists(python_exe):
-            python_exe = sys.executable  # Fall back to the current Python executable
-        
 
         with open(mutant_file) as f:
             mutants_data = json.load(f)
@@ -436,16 +424,16 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
         with open(input_file, 'r') as f:
             source_code = f.read()
 
-        # Get module name from file path - use the filename itself
-        file_path = Path(input_file)
-        module_name = file_path.stem
-        filename = file_path.name  # Get the actual filename with extension
+        # Get module name from file path
+        module_name = Path(input_file).stem
+        # Get the actual filename for module identification
+        filename = Path(input_file).name
 
         is_test_file = module_name.startswith('test_') or 'test' in module_name
 
         # First, remove any existing mutation support imports
         source_code = re.sub(
-            r'import os.*?from mutation_support import.*?plugin\.load_mutants\(\).*?\n',
+            r'import os.*?from pypseudo_instrumentation import.*?plugin\.load_mutants\(\).*?\n',
             '',
             source_code,
             flags=re.DOTALL | re.MULTILINE
@@ -453,7 +441,7 @@ def run_instrumentation(input_file, mutant_file, safe_mode=False):
         
         # Also remove any individual imports of mutation_support
         source_code = re.sub(
-            r'from mutation_support import.*?\n',
+            r'from pypseudo_instrumentation import.*?\n',
             '',
             source_code,
             flags=re.MULTILINE
@@ -504,17 +492,7 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
             source_code = import_header + source_code
             
             # Now instrument the code
-            # Parse the AST and set the module_name to the filename
-            tree = ast.parse(source_code)
-            tree.module_name = filename  # Use filename instead of just stem
-            
-            if safe_mode:
-                # Use safe mode instrumentation for complex libraries
-                mutated_code = instrument_code_safe(source_code, 'plugin', enabled_mutants, filename)
-            else:
-                # Standard instrumentation
-                mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
-                
+            mutated_code = instrument_code(source_code, 'plugin', enabled_mutants, filename)
             source_code = mutated_code
 
         with open(input_file, 'w') as f:
@@ -534,7 +512,7 @@ def process_project(project_path, mutant_file, safe_mode=False):
         safe_mode: Whether to use conservative instrumentation for complex projects
     """
     try:
-        # Ensure required packages are installed in the working directory
+        # Ensure required packages are installed
         try:
             logger.info("Installing required packages in working directory...")
             subprocess.run(
@@ -545,15 +523,31 @@ def process_project(project_path, mutant_file, safe_mode=False):
             logger.info("Required packages installed successfully.")
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to install required packages: {e}")
-            logger.error(f"stdout: {e.stdout.decode()}")
-            logger.error(f"stderr: {e.stderr.decode()}")
-        # Check if pypseudo_instrumentation is installed
-        try:
-            import pypseudo_instrumentation
-        except ImportError:
-            logger.error("ERROR: pypseudo_instrumentation package is not installed.")
-            logger.error("Please install it with: pip install -e ./pypseudo_instrumentation")
-            return None
+            if hasattr(e, 'stdout'):
+                logger.error(f"stdout: {e.stdout.decode() if e.stdout else ''}")
+            if hasattr(e, 'stderr'):
+                logger.error(f"stderr: {e.stderr.decode() if e.stderr else ''}")
+            
+        # Verify mutation_support.py is available
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent.parent
+        mutation_support_path = project_root / 'pypseudo_instrumentation' / 'mutation_support.py'
+        
+        if not mutation_support_path.exists():
+            logger.warning(f"mutation_support.py not found at {mutation_support_path}")
+            # Try alternative locations
+            for path in [
+                current_dir.parent.parent.parent / 'pypseudo_instrumentation' / 'mutation_support.py',
+                Path.cwd() / 'pypseudo_instrumentation' / 'mutation_support.py',
+                Path.cwd().parent / 'pypseudo_instrumentation' / 'mutation_support.py'
+            ]:
+                if path.exists():
+                    logger.info(f"Found mutation_support.py at {path}")
+                    break
+            else:
+                logger.error("Could not find mutation_support.py in any expected location")
+        else:
+            logger.info(f"Found mutation_support.py at {mutation_support_path}")
             
         working_dir = setup_project_environment(project_path)
         
@@ -583,8 +577,6 @@ os.environ['PYPSEUDO_CONFIG_FILE'] = str(Path(__file__).parent / '.pypseudo' / '
                 run_instrumentation(py_file, mutant_file, safe_mode=safe_mode)
                 
         return working_dir
-    
-        
     except Exception as e:
         logger.error(f"Error processing project: {e}")
         raise

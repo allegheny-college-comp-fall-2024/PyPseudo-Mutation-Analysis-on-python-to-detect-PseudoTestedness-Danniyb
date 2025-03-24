@@ -1,28 +1,17 @@
 [tool.poetry]
-name = "pypseudo"
+name = "pypseudo-project"
 version = "0.1.0"
-description = "A Pseudo-Tested Code Identifier for Python - inspired by PSEUDOSWEEP"
-authors = ["Your Name <your.email@example.com>"]
-readme = "README.md"
-packages = [
-    {include = "pypseudo"},
-    {include = "pypseudo_instrumentation"}
-]
+description = "PyPseudo mutation testing tools"
+authors = ["Daniel Bekele <your.email@example.com>"]
+packages = []
+package-mode = false  
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pytest = "^7.0.0"
-astor = "^0.8.1"
-pytest-json-report = "^1.5.0"
-tomli = "^2.2.1"
-
-[tool.poetry.group.dev.dependencies]
-black = "^23.0.0"
-pytest-cov = "^4.0.0"
-
-[tool.poetry.scripts]
-pypseudo = "pypseudo.cli.main:main"
+# Reference the sub-packages as path dependencies
+pypseudo = { path = "pypseudo", develop = true }
+pypseudo_instrumentation = { path = "pypseudo_instrumentation", develop = true }
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
