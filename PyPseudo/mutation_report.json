@@ -1,0 +1,285 @@
+{
+    "summary": {
+        "total_mutations": 9,
+        "killed_mutations": 7,
+        "survived_mutations": 2,
+        "unknown_mutations": 0
+    },
+    "mutations": {
+        "xmt_containment_check_list_containment.py_1": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_list",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_list_edge_cases",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 35,
+                "failed_tests": 2,
+                "error_tests": 0
+            }
+        },
+        "xmt_perform_containment_check_benchmark_main.py_1": {
+            "passed": true,
+            "test": {
+                "killed_by": [],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 37,
+                "failed_tests": 0,
+                "error_tests": 0
+            }
+        },
+        "xmt_generate_random_container_generate.py_2": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[5-10-False]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[5-10-True]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[0-10-False]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[0-10-True]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[1000-100-False]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container[1000-100-True]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_uniqueness",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_value_distribution",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_invalid_size[-1]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_invalid_size[-100]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_invalid_maximum[-1]",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_container_invalid_maximum[-100]",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 25,
+                "failed_tests": 12,
+                "error_tests": 0
+            }
+        },
+        "xmt_containment_check_set_containment.py_3": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_set",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_set_edge_cases",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_set_duplicates",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 34,
+                "failed_tests": 3,
+                "error_tests": 0
+            }
+        },
+        "xmt_containmentcheck_main.py_2": {
+            "passed": true,
+            "test": {
+                "killed_by": [],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 37,
+                "failed_tests": 0,
+                "error_tests": 0
+            }
+        },
+        "xmt_calculate_average_values_analyze.py_1": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_analyze.py::test_calculate_average_values_basic",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_analyze.py::test_calculate_average_values_empty",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_analyze.py::test_calculate_average_values_single",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_analyze.py::test_calculate_average_values_precision",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_analyze.py::test_calculate_average_values_large_numbers",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 32,
+                "failed_tests": 5,
+                "error_tests": 0
+            }
+        },
+        "xmt_generate_random_number_generate.py_1": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_number_basic",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_number_edge_cases",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_generate.py::test_generate_random_number_large_values",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 34,
+                "failed_tests": 3,
+                "error_tests": 0
+            }
+        },
+        "xmt_human_readable_boolean_util.py_1": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_util.py::test_human_readable_boolean_true",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_util.py::test_human_readable_boolean_false",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_util.py::test_human_readable_boolean_true_variations",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_util.py::test_human_readable_boolean_false_variations",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_util.py::test_human_readable_boolean_type",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 32,
+                "failed_tests": 5,
+                "error_tests": 0
+            }
+        },
+        "xmt_containment_check_tuple_containment.py_2": {
+            "passed": false,
+            "test": {
+                "killed_by": [
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_tuple",
+                        "outcome": "failed",
+                        "details": ""
+                    },
+                    {
+                        "test_id": "tests/test_containment.py::test_containment_check_tuple_edge_cases",
+                        "outcome": "failed",
+                        "details": ""
+                    }
+                ],
+                "mutant_type": "xmt",
+                "total_tests": 37,
+                "passed_tests": 35,
+                "failed_tests": 2,
+                "error_tests": 0
+            }
+        }
+    },
+    "metadata": {
+        "timestamp": "2025-03-30T12:52:48.926511",
+        "target": "../../../202/computer-science-202-algorithm-engineering-project-2-Danniyb/containmentcheck",
+        "baseline_tests": {
+            "total": 37,
+            "passed": 37,
+            "failed": 0
+        }
+    }
+}

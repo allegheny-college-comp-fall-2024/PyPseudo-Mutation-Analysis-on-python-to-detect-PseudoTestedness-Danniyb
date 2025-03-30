@@ -950,25 +950,36 @@ def run_all_mutations(args, pytest_args, working_dir=None):
         for test in mutant_report.get('tests', []):
             test_id = test.get('nodeid')
             outcome = test.get('outcome')
-            mutant_test_outcomes[test_id] = outcome == 'passed'
+            # Store both the outcome and any error/failure details
+            mutant_test_outcomes[test_id] = {
+                'passed': outcome == 'passed',
+                'outcome': outcome,
+                'details': test.get('longrepr', '')  # Get failure/error details if any
+            }
         
-        # A mutant is killed if ANY test that passed in the baseline now fails
+        # A mutant is killed if ANY test fails or errors with the mutant
         killed = False
         killed_by = []
         
-        for test_id, passed_in_baseline in baseline_test_outcomes.items():
-            if passed_in_baseline:  # Test passed in baseline
-                passed_with_mutant = mutant_test_outcomes.get(test_id, False)
-                if not passed_with_mutant:  # Test now fails with mutant
-                    killed = True
-                    killed_by.append(test_id)
+        for test_id, mutant_result in mutant_test_outcomes.items():
+            if mutant_result['outcome'] in ['failed', 'error']:
+                killed = True
+                killed_by.append({
+                    'test_id': test_id,
+                    'outcome': mutant_result['outcome'],
+                    'details': mutant_result['details']
+                })
         
-        # Store the result
+        # Store the result with more detailed information
         results[mutant_id] = {
             'passed': not killed,  # True if mutant survived (no test killed it)
             'test': {
                 'killed_by': killed_by,
-                'mutant_type': mut_type
+                'mutant_type': mut_type,
+                'total_tests': len(mutant_test_outcomes),
+                'passed_tests': sum(1 for r in mutant_test_outcomes.values() if r['passed']),
+                'failed_tests': sum(1 for r in mutant_test_outcomes.values() if r['outcome'] == 'failed'),
+                'error_tests': sum(1 for r in mutant_test_outcomes.values() if r['outcome'] == 'error')
             }
         }
         
