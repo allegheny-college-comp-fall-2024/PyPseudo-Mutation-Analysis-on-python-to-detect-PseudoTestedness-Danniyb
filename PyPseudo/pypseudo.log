@@ -1,10 +1,69 @@
-2025-03-30 16:56:20,596 - root - INFO - Running all mutations grouped by test coverage...
-2025-03-30 16:56:20,596 - pypseudo.cli.main - INFO - Running all mutations for project: ../../../deepdiff
-2025-03-30 16:56:20,596 - pypseudo.cli.main - INFO - Working directory: ../../../deepdiff_pypseudo_work
-2025-03-30 16:56:20,596 - pypseudo.cli.main - INFO - Collecting existing mutants from instrumented code
-2025-03-30 16:56:20,598 - pypseudo.cli.main - INFO - Found 261 mutants in the instrumented code
-2025-03-30 16:56:20,608 - pypseudo.cli.main - INFO - Found 261 mutants in the instrumented code
-2025-03-30 16:56:20,608 - pypseudo.cli.main - INFO - Running baseline tests (no mutations)
-2025-03-30 16:56:20,608 - pypseudo.cli.main - INFO - Running baseline tests
-2025-03-30 16:56:26,222 - pypseudo.cli.main - ERROR - Error reading JSON report: [Errno 2] No such file or directory: '../../../deepdiff_pypseudo_work/.pypseudo/pytest_report.json'
-2025-03-30 16:56:26,223 - pypseudo.cli.main - ERROR - Failed to get baseline results
+2025-04-25 13:38:46,904 - root - INFO - Running all mutations grouped by test coverage...
+2025-04-25 13:38:46,904 - pypseudo.cli.main - INFO - Running mutations in /Users/danielbekele/senior/202/computer-science-202-algorithm-engineering-project-2-Danniyb/containmentcheck_pypseudo_work
+2025-04-25 13:38:46,905 - pypseudo.cli.main - INFO - Running baseline tests...
+2025-04-25 13:38:46,905 - pypseudo.cli.main - INFO - 
+Running Baseline...
+2025-04-25 13:38:47,146 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:47,146 - pypseudo.cli.main - INFO - Collecting mutants from instrumented code...
+2025-04-25 13:38:47,147 - pypseudo.cli.main - INFO - Collecting existing mutants from instrumented code
+2025-04-25 13:38:47,148 - pypseudo.cli.main - INFO - Found 9 mutants in the instrumented code
+2025-04-25 13:38:47,149 - pypseudo.cli.main - INFO - Found 9 mutants
+2025-04-25 13:38:47,149 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_human_readable_boolean_util.py_1
+2025-04-25 13:38:47,149 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_human_readable_boolean_util.py_1...
+2025-04-25 13:38:47,367 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:47,368 - pypseudo.cli.main - INFO - Mutant xmt_human_readable_boolean_util.py_1 killed by test failures
+2025-04-25 13:38:47,368 - pypseudo.cli.main - INFO - Mutant xmt_human_readable_boolean_util.py_1 killed by test: tests/test_util.py::test_human_readable_boolean_true
+2025-04-25 13:38:47,368 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_containment_check_set_containment.py_3
+2025-04-25 13:38:47,368 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_containment_check_set_containment.py_3...
+2025-04-25 13:38:47,583 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:47,584 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_set_containment.py_3 killed by test failures
+2025-04-25 13:38:47,584 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_set_containment.py_3 killed by test: tests/test_containment.py::test_containment_check_set
+2025-04-25 13:38:47,584 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_containment_check_tuple_containment.py_2
+2025-04-25 13:38:47,584 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_containment_check_tuple_containment.py_2...
+2025-04-25 13:38:47,799 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:47,799 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_tuple_containment.py_2 killed by test failures
+2025-04-25 13:38:47,800 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_tuple_containment.py_2 killed by test: tests/test_containment.py::test_containment_check_tuple
+2025-04-25 13:38:47,800 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_generate_random_container_generate.py_2
+2025-04-25 13:38:47,800 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_generate_random_container_generate.py_2...
+2025-04-25 13:38:48,026 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:48,027 - pypseudo.cli.main - INFO - Mutant xmt_generate_random_container_generate.py_2 killed by test failures
+2025-04-25 13:38:48,027 - pypseudo.cli.main - INFO - Mutant xmt_generate_random_container_generate.py_2 killed by test: tests/test_generate.py::test_generate_random_container[5-10-False]
+2025-04-25 13:38:48,027 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_perform_containment_check_benchmark_main.py_1
+2025-04-25 13:38:48,027 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_perform_containment_check_benchmark_main.py_1...
+2025-04-25 13:38:48,234 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:48,234 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_generate_random_number_generate.py_1
+2025-04-25 13:38:48,234 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_generate_random_number_generate.py_1...
+2025-04-25 13:38:48,456 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:48,457 - pypseudo.cli.main - INFO - Mutant xmt_generate_random_number_generate.py_1 killed by test failures
+2025-04-25 13:38:48,457 - pypseudo.cli.main - INFO - Mutant xmt_generate_random_number_generate.py_1 killed by test: tests/test_generate.py::test_generate_random_number_basic
+2025-04-25 13:38:48,457 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_calculate_average_values_analyze.py_1
+2025-04-25 13:38:48,457 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_calculate_average_values_analyze.py_1...
+2025-04-25 13:38:48,683 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:48,683 - pypseudo.cli.main - INFO - Mutant xmt_calculate_average_values_analyze.py_1 killed by test failures
+2025-04-25 13:38:48,683 - pypseudo.cli.main - INFO - Mutant xmt_calculate_average_values_analyze.py_1 killed by test: tests/test_analyze.py::test_calculate_average_values_basic
+2025-04-25 13:38:48,683 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_containmentcheck_main.py_2
+2025-04-25 13:38:48,684 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_containmentcheck_main.py_2...
+2025-04-25 13:38:48,888 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:48,889 - pypseudo.cli.main - INFO - 
+Testing mutant: xmt_containment_check_list_containment.py_1
+2025-04-25 13:38:48,889 - pypseudo.cli.main - INFO - 
+Running Mutant xmt_containment_check_list_containment.py_1...
+2025-04-25 13:38:49,109 - pypseudo.cli.main - INFO - Test Summary: 0 total, 0 passed, 0 failed, 0 error, 0 skipped
+2025-04-25 13:38:49,110 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_list_containment.py_1 killed by test failures
+2025-04-25 13:38:49,110 - pypseudo.cli.main - INFO - Mutant xmt_containment_check_list_containment.py_1 killed by test: tests/test_containment.py::test_containment_check_list
