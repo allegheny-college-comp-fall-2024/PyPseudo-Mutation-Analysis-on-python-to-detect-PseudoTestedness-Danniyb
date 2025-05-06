@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "pypseudo"
+version = "0.1.0"
+description = "A Pseudo-Tested Code Identifier for Python"
+authors = ["Daniel Bekele <your.email@example.com>"]
+packages = [{include = "pypseudo"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pytest = "7.4.3"
+astor = "^0.8.1"
+pypseudo_instrumentation = {path = "../pypseudo_instrumentation"}
+pytest-json-report = "1.5.0"
+pytest-asyncio = "0.21.1"
+
+[tool.poetry.scripts]
+pypseudo = "pypseudo.cli.main:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

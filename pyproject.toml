@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "pypseudo-project"
+version = "0.1.0"
+description = "PyPseudo mutation testing tools"
+authors = ["Daniel Bekele <your.email@example.com>"]
+packages = []
+package-mode = false  
+
+[tool.poetry.dependencies]
+python = "^3.8"
+# Reference the sub-packages as path dependencies
+pypseudo = { path = "pypseudo", develop = true }
+pypseudo_instrumentation = { path = "pypseudo_instrumentation", develop = true }
+pytest = "7.4.3"
+pytest-json-report = "1.5.0"
+pytest-asyncio = "0.21.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
